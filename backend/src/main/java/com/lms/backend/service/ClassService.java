@@ -1,7 +1,5 @@
 package com.lms.backend.service;
 
-import com.google.api.core.ApiFuture;
-import com.google.cloud.firestore.*;
 import com.lms.backend.dto.request.ClassRequest;
 import com.lms.backend.dto.response.ClassResponse;
 import com.lms.backend.entity.ClassEntity;
@@ -10,10 +8,12 @@ import com.lms.backend.repository.ClassRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 @Service
 public class ClassService {
@@ -26,83 +26,59 @@ public class ClassService {
 
     // CREATE
     public String createClass(ClassRequest request) throws ExecutionException, InterruptedException {
+        // 1. Business Logic & Mapping
         ClassEntity entity = classMapper.toEntity(request);
         entity.setCreateDate(new Date());
         entity.setCreatedBy(request.getRequestedBy());
         entity.setDeleted(false);
 
-        DocumentReference docRef = classRepository.getClassCollection().document();
-        entity.setId(docRef.getId());
-
-        ApiFuture<String> transactionResult = classRepository.getFirestore().runTransaction(transaction -> {
-
-            transaction.set(docRef, entity);
-
-            return docRef.getId();
-        });
-
-        return transactionResult.get();
+        // 2. Gọi Repository
+        return classRepository.save(entity);
     }
 
     // READ
     public List<ClassResponse> getAllClasses() throws ExecutionException, InterruptedException {
-        List<ClassResponse> responseList = new ArrayList<>();
+        // 1. Lấy Entities từ DB
+        List<ClassEntity> entities = classRepository.findAllActive();
 
-        ApiFuture<QuerySnapshot> future = classRepository.getClassCollection()
-                .whereEqualTo("deleted", false).get();
-
-        List<QueryDocumentSnapshot> documents = future.get().getDocuments();
-
-        for (QueryDocumentSnapshot doc : documents) {
-            ClassEntity entity = doc.toObject(ClassEntity.class);
-            entity.setId(doc.getId());
-            responseList.add(classMapper.toResponse(entity));
-        }
-
-        return responseList;
+        // 2. Map sang Response DTO
+        return entities.stream()
+                .map(classMapper::toResponse)
+                .collect(Collectors.toList());
     }
 
     // UPDATE
-    public String updateClass(String classId, ClassRequest request) throws ExecutionException, InterruptedException {
-        DocumentReference docRef = classRepository.getClassCollection().document(classId);
+    public String updateClass(String classId, ClassRequest request) throws Exception {
+        // 1. Validate nghiệp vụ
+        ClassEntity existingClass = classRepository.findById(classId);
+        if (existingClass == null) {
+            throw new Exception("Lớp học không tồn tại, không thể cập nhật!");
+        }
 
-        ApiFuture<String> transactionResult = classRepository.getFirestore().runTransaction(transaction -> {
-            DocumentSnapshot snapshot = transaction.get(docRef).get();
-            if (!snapshot.exists()) {
-                throw new Exception("Lớp học không tồn tại, không thể cập nhật!"); // Kích hoạt Rollback
-            }
+        // 2. Cập nhật Entity
+        ClassEntity updatedEntity = classMapper.toEntity(request);
+        updatedEntity.setUpdateDate(new Date());
+        updatedEntity.setUpdateBy(request.getRequestedBy());
 
-            ClassEntity updatedEntity = classMapper.toEntity(request);
-            updatedEntity.setUpdateDate(new Date());
-            updatedEntity.setUpdateBy(request.getRequestedBy());
-
-            transaction.set(docRef, updatedEntity, SetOptions.merge());
-
-            return "Cập nhật thành công Lớp: " + classId;
-        });
-
-        return transactionResult.get();
+        // 3. Lưu qua Repo
+        return classRepository.update(classId, updatedEntity);
     }
 
     // DELETE SOFT
-    public String deleteClass(String classId, String deletedBy) throws ExecutionException, InterruptedException {
-        DocumentReference docRef = classRepository.getClassCollection().document(classId);
+    public String deleteClass(String classId, String deletedBy) throws Exception {
+        // 1. Validate
+        ClassEntity existingClass = classRepository.findById(classId);
+        if (existingClass == null) {
+            throw new Exception("Lớp học không tồn tại!");
+        }
 
-        ApiFuture<String> transactionResult = classRepository.getFirestore().runTransaction(transaction -> {
-            DocumentSnapshot snapshot = transaction.get(docRef).get();
-            if (!snapshot.exists()) {
-                throw new Exception("Lớp học không tồn tại!");
-            }
+        // 2. Chuẩn bị data update
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("deleted", true);
+        updates.put("updateDate", new Date());
+        updates.put("updateBy", deletedBy);
 
-            transaction.update(docRef,
-                    "deleted", true,
-                    "updateDate", new Date(),
-                    "updateBy", deletedBy
-            );
-
-            return "Đã xóa mềm thành công!";
-        });
-
-        return transactionResult.get();
+        // 3. Thực thi qua repo
+        return classRepository.softDelete(classId, updates);
     }
 }
