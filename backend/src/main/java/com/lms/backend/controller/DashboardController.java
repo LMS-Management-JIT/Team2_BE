@@ -2,9 +2,11 @@ package com.lms.backend.controller;
 
 import com.lms.backend.dto.response.ClassesResponse;
 import com.lms.backend.dto.response.ModulesResponse;
+import com.lms.backend.dto.response.StudentsResponse;
 import com.lms.backend.dto.response.TeachersResponse;
 import com.lms.backend.service.IClassService;
 import com.lms.backend.service.IModuleService;
+import com.lms.backend.service.IStudentService;
 import com.lms.backend.service.ITeacherService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +21,7 @@ public class DashboardController {
     private final IClassService classService;
     private final IModuleService moduleService;
     private final ITeacherService teacherService;
+    private final IStudentService studentService;
 
     @GetMapping("/total-classes")
     public ClassesResponse getTotalClasses() throws Exception {
@@ -41,6 +44,15 @@ public class DashboardController {
 
         return new TeachersResponse(
                 teacherService.countTeachers()
+        );
+    }
+
+    @GetMapping("/total-students")
+    public StudentsResponse getTotalStudents()
+            throws Exception {
+
+        return new StudentsResponse(
+                studentService.countStudents()
         );
     }
 }
