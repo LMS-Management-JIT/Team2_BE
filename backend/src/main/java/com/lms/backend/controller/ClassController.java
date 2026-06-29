@@ -3,6 +3,7 @@ package com.lms.backend.controller;
 import com.lms.backend.dto.request.ClassRequest;
 import com.lms.backend.dto.response.ClassResponse;
 import com.lms.backend.service.ClassService;
+import com.lms.backend.service.IClassService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -17,7 +18,7 @@ import java.util.List;
 public class ClassController {
 
     @Autowired
-    private ClassService classService;
+    private IClassService classService;
 
     // @Valid: Kích hoạt kiểm tra dữ liệu từ ClassRequest
     // @PreAuthorize: Chỉ User có role ADMIN mới được tạo lớp

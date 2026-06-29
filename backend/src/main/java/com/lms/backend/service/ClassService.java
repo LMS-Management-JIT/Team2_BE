@@ -16,7 +16,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 @Service
-public class ClassService {
+public class ClassService implements IClassService {
 
     @Autowired
     private ClassRepository classRepository;
@@ -25,6 +25,7 @@ public class ClassService {
     private ClassMapper classMapper;
 
     // CREATE
+    @Override
     public String createClass(ClassRequest request) throws ExecutionException, InterruptedException {
         // 1. Business Logic & Mapping
         ClassEntity entity = classMapper.toEntity(request);
@@ -37,6 +38,7 @@ public class ClassService {
     }
 
     // READ
+    @Override
     public List<ClassResponse> getAllClasses() throws ExecutionException, InterruptedException {
         // 1. Lấy Entities từ DB
         List<ClassEntity> entities = classRepository.findAllActive();
@@ -48,11 +50,13 @@ public class ClassService {
     }
 
     // UPDATE
-    public String updateClass(String classId, ClassRequest request) throws Exception {
+    @Override
+    public String updateClass(String classId, ClassRequest request) throws ExecutionException, InterruptedException {
         // 1. Validate nghiệp vụ
         ClassEntity existingClass = classRepository.findById(classId);
         if (existingClass == null) {
-            throw new Exception("Lớp học không tồn tại, không thể cập nhật!");
+            // Đổi sang IllegalArgumentException để không vi phạm chữ ký hàm
+            throw new IllegalArgumentException("Lớp học không tồn tại, không thể cập nhật!");
         }
 
         // 2. Cập nhật Entity
@@ -65,11 +69,13 @@ public class ClassService {
     }
 
     // DELETE SOFT
-    public String deleteClass(String classId, String deletedBy) throws Exception {
+    @Override
+    public String deleteClass(String classId, String deletedBy) throws ExecutionException, InterruptedException {
         // 1. Validate
         ClassEntity existingClass = classRepository.findById(classId);
         if (existingClass == null) {
-            throw new Exception("Lớp học không tồn tại!");
+            // Đổi sang IllegalArgumentException
+            throw new IllegalArgumentException("Lớp học không tồn tại!");
         }
 
         // 2. Chuẩn bị data update
