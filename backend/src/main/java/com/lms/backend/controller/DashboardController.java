@@ -1,17 +1,13 @@
 package com.lms.backend.controller;
 
-import com.lms.backend.dto.response.ClassesResponse;
-import com.lms.backend.dto.response.ModulesResponse;
-import com.lms.backend.dto.response.StudentsResponse;
-import com.lms.backend.dto.response.TeachersResponse;
-import com.lms.backend.service.IClassService;
-import com.lms.backend.service.IModuleService;
-import com.lms.backend.service.IStudentService;
-import com.lms.backend.service.ITeacherService;
+import com.lms.backend.dto.response.*;
+import com.lms.backend.service.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/dashboard")
@@ -22,6 +18,7 @@ public class DashboardController {
     private final IModuleService moduleService;
     private final ITeacherService teacherService;
     private final IStudentService studentService;
+    private final IHistoryService historyService;
 
     @GetMapping("/total-classes")
     public ClassesResponse getTotalClasses() throws Exception {
@@ -54,5 +51,11 @@ public class DashboardController {
         return new StudentsResponse(
                 studentService.countStudents()
         );
+    }
+
+    @GetMapping("/history")
+    public List<HistoryResponse> getHistory() throws Exception {
+
+        return historyService.getRecentHistory();
     }
 }
