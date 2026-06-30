@@ -8,7 +8,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
- 
+import java.time.LocalDateTime;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -22,13 +23,13 @@ public class RoleEntity {
     private Boolean deleted;
 
     @PropertyName("create_date")
-    private Instant createDate;
+    private LocalDateTime createDate;
 
     @PropertyName("created_by")
     private String createdBy;
 
     @PropertyName("update_date")
-    private Instant updateDate;
+    private LocalDateTime updateDate;
 
     @PropertyName("update_by")
     private String updateBy;

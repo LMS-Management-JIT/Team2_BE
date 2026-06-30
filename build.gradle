@@ -44,6 +44,7 @@ dependencies {
 
     //Firebase admin SDK
     implementation 'com.google.firebase:firebase-admin:9.2.0'
+    implementation "me.paulschwarz:spring-dotenv:4.0.0"
 }
 
 tasks.named('test') {
