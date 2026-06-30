@@ -1,0 +1,6 @@
+firebase:
+  service-account-path: ${FIREBASE_SERVICE_ACCOUNT}
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION}
