@@ -20,10 +20,17 @@ public class RoleEntity {
 
     private String name;
     private Boolean deleted;
- 
+
+    @PropertyName("create_date")
     private Instant createDate;
+
+    @PropertyName("created_by")
     private String createdBy;
+
+    @PropertyName("update_date")
     private Instant updateDate;
+
+    @PropertyName("update_by")
     private String updateBy;
 }
  
