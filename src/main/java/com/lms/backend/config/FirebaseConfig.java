@@ -17,7 +17,7 @@ import java.io.InputStream;
 @Configuration
 public class FirebaseConfig {
 
-    @Value("${firebase.service-account-path}")
+    @Value("${firebase.service-account-path:$classpath:firebase-service-account.json}")
     private String serviceAccountPath;
 
     private final ResourceLoader resourceLoader;

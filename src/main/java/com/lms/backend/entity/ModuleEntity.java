@@ -1,4 +1,6 @@
 package com.lms.backend.entity;
+
+import com.google.cloud.Timestamp;
 import com.google.cloud.firestore.annotation.DocumentId;
 import com.google.cloud.firestore.annotation.PropertyName;
 import lombok.AllArgsConstructor;
@@ -9,7 +11,11 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 
 
-public class Module {
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class ModuleEntity {
+
     @DocumentId
     private String id;
 
