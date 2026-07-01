@@ -16,10 +16,7 @@ public class DashboardController {
     private final IModuleService moduleService;
 
     @GetMapping("/total-modules")
-    public ModuleResponse getTotalModules() throws Exception {
-
-        return new ModuleResponse(
-                moduleService.countModules()
-        );
+    public DashboardResponse getTotalModules() throws Exception {
+        return new DashboardResponse(moduleService.countModules());
     }
 }
