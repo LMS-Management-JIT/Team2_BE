@@ -1,10 +1,7 @@
 package com.lms.backend.service.impl;
 
 import com.lms.backend.dto.response.DashboardResponse;
-import com.lms.backend.service.IDashboardService;
-import com.lms.backend.service.IModuleService;
-import com.lms.backend.service.IClassService;
-import com.lms.backend.service.IStudentService;
+import com.lms.backend.service.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -15,6 +12,7 @@ public class DashboardServiceImpl implements IDashboardService {
     private final IModuleService moduleService;
     private final IClassService classService;
     private final IStudentService studentService;
+    private final ITeacherService teacherService;
 
     @Override
     public DashboardResponse getDashboardData() throws Exception {
@@ -22,6 +20,7 @@ public class DashboardServiceImpl implements IDashboardService {
                 .totalModules(moduleService.countModules())
                 .totalClasses(classService.countClasses())
                 .totalStudents(studentService.countStudents())
+                .totalTeachers(teacherService.countTeachers())
                 .build();
     }
 }
