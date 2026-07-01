@@ -19,7 +19,7 @@ public class HistoryEntity {
     @DocumentId
     private String id;
 
-    private String action;
+    private ActionType action;
 
     @PropertyName("actor_id")
     private String actorId;
