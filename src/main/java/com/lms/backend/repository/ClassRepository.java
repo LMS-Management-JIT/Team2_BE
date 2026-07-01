@@ -4,6 +4,7 @@ import com.google.api.core.ApiFuture;
 import com.google.cloud.firestore.*;
 import com.lms.backend.entity.ClassEntity;
 import com.lms.backend.mapper.ClassMapper;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
@@ -14,6 +15,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 @Repository
+@RequiredArgsConstructor
 public class ClassRepository {
 
     @Autowired
@@ -149,5 +151,12 @@ public class ClassRepository {
 
         batch.commit().get();
         return "Đã xóa mềm Lớp học và dọn dẹp các liên kết liên quan thành công!";
+    }
+
+    public long countActive() throws Exception {
+        return getClassCollection()
+                .whereEqualTo("deleted", false)
+                .get().get()
+                .size();
     }
 }
