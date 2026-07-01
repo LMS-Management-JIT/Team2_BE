@@ -3,11 +3,10 @@ package com.lms.backend.repository;
 import com.google.api.core.ApiFuture;
 import com.google.cloud.firestore.*;
 import com.lms.backend.entity.ClassEntity;
+import com.lms.backend.mapper.ClassMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -20,6 +19,9 @@ public class ClassRepository {
     @Autowired
     private Firestore firestore;
 
+    @Autowired
+    private ClassMapper classMapper;
+
     private CollectionReference getClassCollection() {
         return firestore.collection("classes");
     }
@@ -28,8 +30,10 @@ public class ClassRepository {
     public String save(ClassEntity entity) throws ExecutionException, InterruptedException {
         DocumentReference docRef = getClassCollection().document();
         entity.setId(docRef.getId());
+
         ApiFuture<String> transactionResult = firestore.runTransaction(transaction -> {
-            transaction.set(docRef, entity);
+            Map<String, Object> dataToSave = classMapper.toFirestoreMap(entity);
+            transaction.set(docRef, dataToSave);
             return docRef.getId();
         });
         return transactionResult.get();
@@ -40,9 +44,10 @@ public class ClassRepository {
         List<ClassEntity> result = new ArrayList<>();
         ApiFuture<QuerySnapshot> future = getClassCollection().whereEqualTo("deleted", false).get();
         for (QueryDocumentSnapshot doc : future.get().getDocuments()) {
-            ClassEntity entity = doc.toObject(ClassEntity.class);
-            entity.setId(doc.getId());
-            result.add(entity);
+            ClassEntity entity = classMapper.fromDocument(doc);
+            if (entity != null) {
+                result.add(entity);
+            }
         }
         return result;
     }
@@ -51,9 +56,7 @@ public class ClassRepository {
     public ClassEntity findById(String classId) throws ExecutionException, InterruptedException {
         DocumentSnapshot snapshot = getClassCollection().document(classId).get().get();
         if (snapshot.exists()) {
-            ClassEntity entity = snapshot.toObject(ClassEntity.class);
-            entity.setId(snapshot.getId());
-            return entity;
+            return classMapper.fromDocument(snapshot);
         }
         return null;
     }
@@ -116,7 +119,8 @@ public class ClassRepository {
     public String update(String classId, ClassEntity updatedEntity) throws ExecutionException, InterruptedException {
         DocumentReference docRef = getClassCollection().document(classId);
         ApiFuture<String> transactionResult = firestore.runTransaction(transaction -> {
-            transaction.set(docRef, updatedEntity, SetOptions.merge());
+            Map<String, Object> dataToUpdate = classMapper.toFirestoreMap(updatedEntity);
+            transaction.set(docRef, dataToUpdate, SetOptions.merge());
             return "Cập nhật thành công Lớp: " + classId;
         });
         return transactionResult.get();
@@ -125,28 +129,25 @@ public class ClassRepository {
     // DELETE SOFT KÈM CASCADE XÓA BẢNG TRUNG GIAN (Tối ưu bằng WriteBatch)
     public String softDeleteWithCascade(String classId, String deletedBy) throws ExecutionException, InterruptedException {
         WriteBatch batch = firestore.batch();
-        LocalDateTime now = LocalDateTime.now();
-        Date dateNow = Date.from(now.atZone(ZoneId.systemDefault()).toInstant());
 
-        // 1. Xóa Lớp
+        Date dateNow = new Date();
+
         DocumentReference classRef = getClassCollection().document(classId);
-        batch.update(classRef, "deleted", true, "updateDate", dateNow, "updateBy", deletedBy);
+        batch.update(classRef, "deleted", true, "update_date", dateNow, "update_by", deletedBy);
 
-        // 2. Xóa liên kết Sinh Viên - Lớp
         List<QueryDocumentSnapshot> studentClasses = firestore.collection("student_class")
                 .whereEqualTo("class_id", classId).whereEqualTo("deleted", false).get().get().getDocuments();
         for (QueryDocumentSnapshot doc : studentClasses) {
-            batch.update(doc.getReference(), "deleted", true, "updateDate", now, "updateBy", deletedBy);
+            batch.update(doc.getReference(), "deleted", true, "update_date", dateNow, "update_by", deletedBy);
         }
 
-        // 3. Xóa liên kết Giảng Viên - Lớp
         List<QueryDocumentSnapshot> teacherClasses = firestore.collection("teacher_class")
                 .whereEqualTo("class_id", classId).whereEqualTo("deleted", false).get().get().getDocuments();
         for (QueryDocumentSnapshot doc : teacherClasses) {
-            batch.update(doc.getReference(), "deleted", true, "updateDate", now, "updateBy", deletedBy);
+            batch.update(doc.getReference(), "deleted", true, "update_date", dateNow, "update_by", deletedBy);
         }
 
-        batch.commit().get(); // Thực thi đồng loạt
+        batch.commit().get();
         return "Đã xóa mềm Lớp học và dọn dẹp các liên kết liên quan thành công!";
     }
 }

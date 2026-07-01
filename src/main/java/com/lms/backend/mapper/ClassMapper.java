@@ -1,14 +1,20 @@
 package com.lms.backend.mapper;
 
+import com.google.cloud.firestore.DocumentSnapshot;
 import com.lms.backend.dto.request.ClassRequest;
 import com.lms.backend.dto.response.ClassResponse;
 import com.lms.backend.entity.ClassEntity;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
 @Component
 public class ClassMapper {
 
-    // 1. Nhận Request từ Frontend -> Chuyển thành Entity để lưu DB
     public ClassEntity toEntity(ClassRequest request) {
         if (request == null) return null;
 
@@ -23,7 +29,6 @@ public class ClassMapper {
                 .build();
     }
 
-    // 2. Lấy Entity từ DB -> Chuyển thành Response trả về Frontend
     public ClassResponse toResponse(ClassEntity entity) {
         if (entity == null) return null;
 
@@ -37,8 +42,6 @@ public class ClassMapper {
         response.setUpdateBy(entity.getUpdateBy());
         response.setDeleted(entity.isDeleted());
         response.setCourseId(entity.getCourseId());
-
-        // Gán trực tiếp LocalDateTime
         response.setStartDateClass(entity.getStartDateClass());
         response.setEndDateClass(entity.getEndDateClass());
         response.setCreateDate(entity.getCreateDate());
@@ -47,7 +50,6 @@ public class ClassMapper {
         return response;
     }
 
-    // 3. Cập nhật Entity từ Request
     public void updateEntityFromRequest(ClassRequest request, ClassEntity existingEntity) {
         if (request == null || existingEntity == null) return;
 
@@ -58,5 +60,53 @@ public class ClassMapper {
         existingEntity.setCourseId(request.getCourseId());
         existingEntity.setStartDateClass(request.getStartDateClass());
         existingEntity.setEndDateClass(request.getEndDateClass());
+    }
+
+    public Map<String, Object> toFirestoreMap(ClassEntity entity) {
+        if (entity == null) return null;
+
+        Map<String, Object> map = new HashMap<>();
+        map.put("class_name", entity.getClassName());
+        map.put("description", entity.getDescription());
+        map.put("programe", entity.getPrograme());
+        map.put("status", entity.getStatus());
+        map.put("deleted", entity.isDeleted());
+        map.put("course_id", entity.getCourseId());
+        map.put("created_by", entity.getCreatedBy());
+        map.put("update_by", entity.getUpdateBy());
+
+        // Đổi LocalDateTime thành Date cho Firestore
+        map.put("start_date_class", toTimestamp(entity.getStartDateClass()));
+        map.put("end_date_class", toTimestamp(entity.getEndDateClass()));
+        map.put("create_date", toTimestamp(entity.getCreateDate()));
+        map.put("update_date", toTimestamp(entity.getUpdateDate()));
+
+        return map;
+    }
+
+    public ClassEntity fromDocument(DocumentSnapshot doc) {
+        if (doc == null || !doc.exists()) return null;
+
+        ClassEntity entity = doc.toObject(ClassEntity.class);
+
+        if (entity != null) {
+            entity.setId(doc.getId());
+            entity.setStartDateClass(toLocalDateTime(doc.getDate("start_date_class")));
+            entity.setEndDateClass(toLocalDateTime(doc.getDate("end_date_class")));
+            entity.setCreateDate(toLocalDateTime(doc.getDate("create_date")));
+            entity.setUpdateDate(toLocalDateTime(doc.getDate("update_date")));
+        }
+
+        return entity;
+    }
+
+    private Date toTimestamp(LocalDateTime localDateTime) {
+        if (localDateTime == null) return null;
+        return Date.from(localDateTime.atZone(ZoneId.systemDefault()).toInstant());
+    }
+
+    private LocalDateTime toLocalDateTime(Date date) {
+        if (date == null) return null;
+        return LocalDateTime.ofInstant(date.toInstant(), ZoneId.systemDefault());
     }
 }
