@@ -1,6 +1,7 @@
 package com.lms.backend.entity;
 
 import com.google.cloud.firestore.annotation.DocumentId;
+import com.google.cloud.firestore.annotation.Exclude;
 import com.google.cloud.firestore.annotation.PropertyName;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,7 +23,7 @@ public class StudentEntity {
     private String profileId;
     @PropertyName("identity_number")
     private String identityNumber;
-    @PropertyName("issue_date")
+    @Exclude
     private LocalDateTime issueDate;
     @PropertyName("issue_place")
     private String issuePlace;
@@ -42,8 +43,8 @@ public class StudentEntity {
     private String createdBy;
     @PropertyName("updated_by")
     private String updatedBy;
-    @PropertyName("create_date")
+    @Exclude
     private LocalDateTime createDate;
-    @PropertyName("update_date")
+    @Exclude
     private LocalDateTime updateDate;
 }
