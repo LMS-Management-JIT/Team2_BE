@@ -17,7 +17,7 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable()) // Tắt CSRF để dùng Postman không bị lỗi
                 .authorizeHttpRequests(auth -> auth
-                        .anyRequest().authenticated() // Tạm thời mở khóa tất cả API để dễ test
+                        .anyRequest().authenticated()// Tạm thời mở khóa tất cả API để dễ test
                 );
         return http.build();
     }
