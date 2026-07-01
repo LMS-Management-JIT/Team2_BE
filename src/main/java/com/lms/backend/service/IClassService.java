@@ -15,4 +15,7 @@ public interface IClassService {
 
     String updateClass(String classId, ClassRequest request) throws ExecutionException, InterruptedException;
     String deleteClass(String classId, String deletedBy) throws ExecutionException, InterruptedException;
+
+    long countClasses() throws Exception;
+
 }

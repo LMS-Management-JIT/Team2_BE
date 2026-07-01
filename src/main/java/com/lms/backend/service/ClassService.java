@@ -87,4 +87,9 @@ public class ClassService implements IClassService {
         // Gọi hàm xóa dây chuyền sử dụng WriteBatch
         return classRepository.softDeleteWithCascade(classId, deletedBy);
     }
+
+    @Override
+    public long countClasses() throws Exception {
+        return classRepository.countActive();
+    }
 }

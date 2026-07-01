@@ -1,5 +1,6 @@
 package com.lms.backend.repository;
 
+import com.google.cloud.firestore.CollectionReference;
 import com.google.cloud.firestore.Firestore;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -8,10 +9,14 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class ModuleRepository {
 
-    private final Firestore firestore;  // chỉ Repository mới inject Firestore
+    private final Firestore firestore;
+
+    private CollectionReference getModuleCollection() {
+        return firestore.collection("modules");
+    }
 
     public long countActive() throws Exception {
-        return firestore.collection("modules")
+        return getModuleCollection()
                 .whereEqualTo("deleted", false)
                 .get().get()
                 .size();
