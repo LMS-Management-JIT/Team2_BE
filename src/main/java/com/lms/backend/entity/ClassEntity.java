@@ -1,13 +1,14 @@
 package com.lms.backend.entity;
 
 import com.google.cloud.firestore.annotation.DocumentId;
+import com.google.cloud.firestore.annotation.Exclude;
 import com.google.cloud.firestore.annotation.PropertyName;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
 @Data
 @Builder
@@ -16,38 +17,34 @@ import java.util.Date;
 public class ClassEntity {
 
     @DocumentId
-    private String id; // Chuyển int thành String cho Firestore
+    private String id;
 
     @PropertyName("class_name")
     private String className;
 
-    @PropertyName("description")
     private String description;
-
-    @PropertyName("programe")
     private String programe;
-
-    @PropertyName("status")
     private String status;
-
-    @PropertyName("end_date_class")
-    private Date endDateClass;
-
-    @PropertyName("create_date")
-    private Date createDate;
-
-    @PropertyName("created_by")
-    private String createdBy;
-
-    @PropertyName("update_date")
-    private Date updateDate;
-
-    @PropertyName("update_by")
-    private String updateBy;
-
-    @PropertyName("deleted")
     private boolean deleted;
 
     @PropertyName("course_id")
     private String courseId;
+
+    @PropertyName("created_by")
+    private String createdBy;
+
+    @PropertyName("update_by")
+    private String updateBy;
+
+    @Exclude
+    private LocalDateTime startDateClass;
+
+    @Exclude
+    private LocalDateTime endDateClass;
+
+    @Exclude
+    private LocalDateTime createDate;
+
+    @Exclude
+    private LocalDateTime updateDate;
 }
