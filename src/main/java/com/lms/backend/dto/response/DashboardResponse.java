@@ -12,4 +12,5 @@ import lombok.NoArgsConstructor;
 public class DashboardResponse {
     private long totalModules;
     private long totalClasses;
+    private long totalStudents;
 }
