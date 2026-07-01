@@ -35,6 +35,16 @@ public class RoleEntity {
     private LocalDateTime createDate;
     @Exclude private LocalDateTime updateDate;
 
+    @Exclude
+    public LocalDateTime getCreateDate() { return this.createDate; }
+    @Exclude
+    public void setCreateDate(LocalDateTime createDate) { this.createDate = createDate; }
+
+    @Exclude
+    public LocalDateTime getUpdateDate() { return this.updateDate; }
+    @Exclude
+    public void setUpdateDate(LocalDateTime updateDate) { this.updateDate = updateDate; }
+
 
     @PropertyName("create_date")
     public Date getCreateDateForFirestore() {
