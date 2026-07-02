@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import java.time.Duration;
 import java.util.Arrays;
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpHeaders;
@@ -36,6 +37,7 @@ public class AuthController {
     @Value("${jwt.expiration}")
     private long refreshExpiration;
 
+    @SneakyThrows
     @PostMapping("/login")
     public ResponseEntity<AccessTokenResponse> login(
             @Valid @RequestBody LoginRequest request,

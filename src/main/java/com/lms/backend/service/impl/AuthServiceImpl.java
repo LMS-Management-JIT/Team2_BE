@@ -6,11 +6,14 @@ import com.lms.backend.dto.LoginResult;
 import com.lms.backend.dto.response.UserResponse;
 import com.lms.backend.entity.AccountEntity;
 import com.lms.backend.entity.RefreshTokenEntity;
+import com.lms.backend.entity.RoleEntity;
 import com.lms.backend.repository.AccountRepository;
+import com.lms.backend.repository.RoleRepository;
 import com.lms.backend.security.JwtUtil;
 import com.lms.backend.service.IAuthService;
 import com.lms.backend.service.IRefreshTokenService;
 import java.time.LocalDateTime;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -27,7 +30,7 @@ import org.springframework.stereotype.Service;
 public class AuthServiceImpl implements IAuthService {
     private static final Logger log = Logger.getLogger(AuthServiceImpl.class.getName());
     private static final long ACCESS_TOKEN_TTL_SECONDS = 900;
-
+    private final RoleRepository roleRepository;
     private final AccountRepository accountRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
@@ -36,21 +39,20 @@ public class AuthServiceImpl implements IAuthService {
     private final IRefreshTokenService refreshTokenService;
 
     @Override
-    public LoginResult login(LoginRequest request, String userAgent) {
+    public LoginResult login(LoginRequest request, String userAgent) throws ExecutionException, InterruptedException {
         authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
 
-        UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
+        UserDetails userDetails = userDetailsService.loadUserByUsername(request.getEmail());
         AccountEntity account = accountRepository.findByUsername(userDetails.getUsername())
                 .orElseThrow(() -> new IllegalStateException("Account not found"));
 
         String accessToken = jwtUtil.generateToken(userDetails);
         RefreshTokenEntity refreshTokenEntity = refreshTokenService.createRefreshToken(account, userAgent);
-
         log.info("User " + account.getEmail() + " logged in");
         return new LoginResult(
-                new AccessTokenResponse(accessToken, ACCESS_TOKEN_TTL_SECONDS, account.getEmail(), account.getRoleId()),
+                new AccessTokenResponse(accessToken, ACCESS_TOKEN_TTL_SECONDS ),
                 refreshTokenEntity.getToken()
         );
     }
@@ -87,16 +89,16 @@ public class AuthServiceImpl implements IAuthService {
         }
 
         Object principal = authentication.getPrincipal();
-        String username;
+        String email;
         if (principal instanceof UserDetails userDetails) {
-            username = userDetails.getUsername();
+            email = userDetails.getUsername();
         } else if (principal instanceof String principalName && !"anonymousUser".equals(principalName)) {
-            username = principalName;
+            email = principalName;
         } else {
             throw new IllegalStateException("Authentication required");
         }
 
-        AccountEntity account = accountRepository.findByUsername(username)
+        AccountEntity account = accountRepository.findByUsername(email)
                 .orElseThrow(() -> new IllegalStateException("Account not found"));
 
         UserResponse response = new UserResponse();

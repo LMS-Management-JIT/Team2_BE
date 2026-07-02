@@ -20,11 +20,14 @@ import java.util.concurrent.ExecutionException;
 @Service
 public class AccountServiceImpl implements IAccountService {
 
-    @Autowired
-    private AccountRepository accountRepository;
+    private final AccountRepository accountRepository;
 
-    @Autowired
-    private AccountMapper accountMapper;
+    private final AccountMapper accountMapper;
+
+    public AccountServiceImpl(AccountRepository accountRepository, AccountMapper accountMapper) {
+        this.accountRepository = accountRepository;
+        this.accountMapper = accountMapper;
+    }
 
     @Override
     public String createAccount(AccountRequest request) throws Exception {
@@ -49,8 +52,8 @@ public class AccountServiceImpl implements IAccountService {
 
         return docs.stream()
                 .map(doc -> {
-                    AccountEntity account = doc.toObject(AccountEntity.class);
-                    account.setId(doc.getId());
+                    AccountEntity account = accountMapper.fromDocument(doc);
+                    if (account != null) account.setId(doc.getId());
                     return accountMapper.toResponse(account);
                 })
                 .toList();
@@ -66,7 +69,7 @@ public class AccountServiceImpl implements IAccountService {
             throw new IllegalArgumentException("Tài khoản với ID " + accountId + " không tồn tại!");
         }
 
-        AccountEntity account = snapshot.toObject(AccountEntity.class);
+        AccountEntity account = accountMapper.fromDocument(snapshot);
 
         if (account == null || Boolean.TRUE.equals(account.getDeleted())) {
             throw new IllegalArgumentException("Tài khoản với ID " + accountId + " đã bị xóa mềm!");
@@ -87,7 +90,7 @@ public class AccountServiceImpl implements IAccountService {
             throw new IllegalArgumentException("Tài khoản với ID " + accountId + " không tồn tại!");
         }
 
-        AccountEntity account = snapshot.toObject(AccountEntity.class);
+        AccountEntity account = accountMapper.fromDocument(snapshot);
         if (account == null || Boolean.TRUE.equals(account.getDeleted())) {
             throw new IllegalArgumentException("Tài khoản với ID " + accountId + " đã bị xóa!");
         }
@@ -95,10 +98,10 @@ public class AccountServiceImpl implements IAccountService {
         Map<String, Object> updates = new HashMap<>();
         updates.put("email", request.getEmail());
         updates.put("password", request.getPassword());
-        updates.put("roleId", request.getRoleId());
+        updates.put("role_id", request.getRoleId());
         updates.put("status", request.getStatus());
-        updates.put("updateDate", Instant.now());
-        updates.put("updateBy", request.getRequestedBy());
+        updates.put("update_date", Instant.now());
+        updates.put("update_by", request.getRequestedBy());
 
         DocumentReference docRef = accountRepository.getAccountCollection().document(accountId);
         accountRepository.update(docRef.getId(), updates);
@@ -110,7 +113,7 @@ public class AccountServiceImpl implements IAccountService {
         throws ExecutionException, InterruptedException {
 
         DocumentSnapshot snapshot = accountRepository.findById(accountId);
-        AccountEntity account = snapshot.toObject(AccountEntity.class);
+        AccountEntity account = accountMapper.fromDocument(snapshot);
 
 
         if (account == null) {

@@ -4,11 +4,17 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 
 @Data
+
 @AllArgsConstructor
 public class AccessTokenResponse {
     private String accessToken;
     private long accessTokenTtlSeconds;
     private String username;
     private String role;
+
+    public AccessTokenResponse(String accessToken, long accessTokenTtlSeconds) {
+        this.accessToken = accessToken;
+        this.accessTokenTtlSeconds = accessTokenTtlSeconds;
+    }
 }
 
