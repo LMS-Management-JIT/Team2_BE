@@ -4,6 +4,8 @@ import com.google.cloud.firestore.DocumentSnapshot;
 import com.lms.backend.dto.request.AccountRequest;
 import com.lms.backend.dto.response.AccountResponse;
 import com.lms.backend.entity.AccountEntity;
+import com.lms.backend.repository.RoleRepository;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -14,6 +16,7 @@ import java.util.Map;
 
 @Component
 public class AccountMapper {
+
 
     public AccountEntity toEntity(AccountRequest request) {
         if (request == null) return null;
@@ -33,16 +36,7 @@ public class AccountMapper {
         if (entity == null) return null;
 
         AccountResponse response = new AccountResponse();
-        response.setId(entity.getId());
-        response.setEmail(entity.getEmail());
-        response.setRoleId(entity.getRoleId());
-        response.setStatus(entity.getStatus());
-        response.setDeleted(entity.getDeleted());
-        response.setCreatedBy(entity.getCreatedBy());
-        response.setUpdateBy(entity.getUpdateBy());
-        response.setCreateDate(entity.getCreateDate());
-        response.setUpdateDate(entity.getUpdateDate());
-
+        BeanUtils.copyProperties(entity, response);
         return response;
     }
 
@@ -79,14 +73,19 @@ public class AccountMapper {
     public AccountEntity fromDocument(DocumentSnapshot doc) {
         if (doc == null || !doc.exists()) return null;
 
-        AccountEntity entity = doc.toObject(AccountEntity.class);
+        AccountEntity entity = AccountEntity.builder()
+                .email(doc.getString("email"))
+                .password(doc.getString("password"))
+                .roleId(doc.getString("role_id"))
+                .status(doc.getString("status"))
+                .deleted(doc.getBoolean("deleted") != null ? doc.getBoolean("deleted") : false)
+                .createdBy(doc.getString("created_by"))
+                .updateBy(doc.getString("update_by"))
+                .createDate(toLocalDateTime(doc.getDate("create_date")))
+                .updateDate(toLocalDateTime(doc.getDate("update_date")))
+                .build();
 
-        if (entity != null) {
-            entity.setId(doc.getId());
-            entity.setCreateDate(toLocalDateTime(doc.getDate("create_date")));
-            entity.setUpdateDate(toLocalDateTime(doc.getDate("update_date")));
-        }
-
+        entity.setId(doc.getId());
         return entity;
     }
 
