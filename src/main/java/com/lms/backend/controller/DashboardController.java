@@ -15,7 +15,6 @@ import javax.management.relation.Role;
 @RequestMapping("/api/dashboard")
 @RequiredArgsConstructor
 @CrossOrigin("*")
-//@PreAuthorize("hasRole('ADMIN')")
 public class DashboardController {
 
     private final IDashboardService dashboardService;
