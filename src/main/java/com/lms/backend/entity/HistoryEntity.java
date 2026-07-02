@@ -1,6 +1,7 @@
 package com.lms.backend.entity;
 
 import com.google.cloud.firestore.annotation.DocumentId;
+import com.google.cloud.firestore.annotation.Exclude;
 import com.google.cloud.firestore.annotation.PropertyName;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -29,13 +30,15 @@ public class HistoryEntity {
 
     private Map<String, ChangeDetail> changes;
 
-    @PropertyName("created_at")
+    @Exclude
     private LocalDateTime createdAt;
 
     @PropertyName("entity_id")
     private String entityId;
+
     @PropertyName("entity_name")
     private String entityName;
+
     @PropertyName("entity_type")
     private String entityType;
 
