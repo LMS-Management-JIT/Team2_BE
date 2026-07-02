@@ -52,8 +52,9 @@ public class AuthServiceImpl implements IAuthService {
         String accessToken = jwtUtil.generateToken(userDetails);
         RefreshTokenEntity refreshTokenEntity = refreshTokenService.createRefreshToken(account, userAgent);
         log.info("User " + account.getEmail() + " logged in");
+
         return new LoginResult(
-                new AccessTokenResponse(accessToken, ACCESS_TOKEN_TTL_SECONDS ),
+                new AccessTokenResponse(accessToken, ACCESS_TOKEN_TTL_SECONDS),
                 refreshTokenEntity.getToken()
         );
     }
