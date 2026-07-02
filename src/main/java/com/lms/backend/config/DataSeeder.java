@@ -45,6 +45,8 @@ public class DataSeeder {
                     .name("ADMIN")
                     .deleted(false)
                     .createdBy("system")
+                    .createDate(java.time.Instant.now())
+                    .updateDate(java.time.Instant.now())
                     .build();
             String id = roleRepository.save(admin);
             log.info("Created role ADMIN with id={}", id);
@@ -54,6 +56,8 @@ public class DataSeeder {
                     .name("TEACHER")
                     .deleted(false)
                     .createdBy("system")
+                    .createDate(java.time.Instant.now())
+                    .updateDate(java.time.Instant.now())
                     .build();
             String id = roleRepository.save(teacher);
             log.info("Created role TEACHER with id={}", id);
@@ -63,6 +67,8 @@ public class DataSeeder {
                     .name("STUDENT")
                     .deleted(false)
                     .createdBy("system")
+                    .createDate(java.time.Instant.now())
+                    .updateDate(java.time.Instant.now())
                     .build();
             String id = roleRepository.save(student);
             log.info("Created role STUDENT with id={}", id);
@@ -92,6 +98,8 @@ public class DataSeeder {
                     .name("ADMIN")
                     .deleted(false)
                     .createdBy("system")
+                    .createDate(java.time.Instant.now())
+                    .updateDate(java.time.Instant.now())
                     .build();
             adminRoleId = roleRepository.save(adminRole);
         }
@@ -103,6 +111,8 @@ public class DataSeeder {
                 .status("ACTIVE")
                 .deleted(false)
                 .createdBy("system")
+                .createDate(java.time.Instant.now())
+                .updateDate(java.time.Instant.now())
                 .build();
 
         String accountId = accountRepository.save(admin);
