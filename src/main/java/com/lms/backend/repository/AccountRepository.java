@@ -47,86 +47,88 @@ public class AccountRepository {
         });
         return transactionResult.get();
     }
-        public Optional<AccountEntity> findByUsername (String username){
-            try {
-                ApiFuture<QuerySnapshot> future = getAccountCollection()
-                        .whereEqualTo("email", username)
-                        .whereEqualTo("deleted", false)
-                        .limit(1)
-                        .get();
 
-                for (QueryDocumentSnapshot doc : future.get().getDocuments()) {
-                    AccountEntity account = accountMapper.fromDocument(doc);
-                    if (account != null) account.setId(doc.getId());
-                    return Optional.ofNullable(account);
-                }
-
-                return Optional.empty();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException("Failed to search account by username", e);
-            } catch (ExecutionException e) {
-                throw new RuntimeException("Failed to search account by username", e);
-            }
-        }
-
-        public DocumentSnapshot findById (String id)
-            throws ExecutionException, InterruptedException {
-
-            return firestore.collection(COLLECTION)
-                    .document(id)
-                    .get()
-                    .get();
-        }
-
-        public List<QueryDocumentSnapshot> findAllActive ()
-            throws ExecutionException, InterruptedException {
-
-            return firestore.collection(COLLECTION)
+    public Optional<AccountEntity> findByUsername(String username) {
+        try {
+            ApiFuture<QuerySnapshot> future = getAccountCollection()
+                    .whereEqualTo("email", username)
                     .whereEqualTo("deleted", false)
-                    .get()
-                    .get()
-                    .getDocuments();
-        }
+                    .limit(1)
+                    .get();
 
-        public String update (String accountId, Map < String, Object > updates)
+            for (QueryDocumentSnapshot doc : future.get().getDocuments()) {
+                AccountEntity account = accountMapper.fromDocument(doc);
+                if (account != null) account.setId(doc.getId());
+                return Optional.ofNullable(account);
+            }
+
+            return Optional.empty();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Failed to search account by username", e);
+        } catch (ExecutionException e) {
+            throw new RuntimeException("Failed to search account by username", e);
+        }
+    }
+
+    public DocumentSnapshot findById(String id)
             throws ExecutionException, InterruptedException {
 
-            DocumentReference docRef =
-                    firestore.collection("accounts").document(accountId);
+        return firestore.collection(COLLECTION)
+                .document(id)
+                .get()
+                .get();
+    }
 
-            ApiFuture<String> future = firestore.runTransaction(transaction -> {
-
-                transaction.update(docRef, updates);
-
-                return "Update thành công";
-            });
-
-            return future.get();
-        }
-
-        public String softDelete (String accountId, String deletedBy)
+    public List<QueryDocumentSnapshot> findAllActive()
             throws ExecutionException, InterruptedException {
 
-            DocumentReference docRef =
-                    firestore.collection("accounts").document(accountId);
+        return firestore.collection(COLLECTION)
+                .whereEqualTo("deleted", false)
+                .get()
+                .get()
+                .getDocuments();
+    }
 
-            ApiFuture<String> future = firestore.runTransaction(transaction -> {
+    public String update(String accountId, Map<String, Object> updates)
+            throws ExecutionException, InterruptedException {
 
-                transaction.update(docRef,
-                        "deleted", true,
-                        "update_date", Instant.now(),
-                        "update_by", deletedBy
-                );
+        DocumentReference docRef =
+                firestore.collection("accounts").document(accountId);
 
-                return "Đã xóa mềm";
-            });
+        ApiFuture<String> future = firestore.runTransaction(transaction -> {
 
-            return future.get();
-        }
+            transaction.update(docRef, updates);
 
-    @Autowired private
+            return "Update thành công";
+        });
+
+        return future.get();
+    }
+
+    public String softDelete(String accountId, String deletedBy)
+            throws ExecutionException, InterruptedException {
+
+        DocumentReference docRef =
+                firestore.collection("accounts").document(accountId);
+
+        ApiFuture<String> future = firestore.runTransaction(transaction -> {
+
+            transaction.update(docRef,
+                    "deleted", true,
+                    "update_date", Instant.now(),
+                    "update_by", deletedBy
+            );
+
+            return "Đã xóa mềm";
+        });
+
+        return future.get();
+    }
+    @Autowired
+    private
     StudentMapper studentMapper;
+
     public AccountEntity findEntityById(String id)
             throws ExecutionException, InterruptedException {
 
@@ -138,6 +140,6 @@ public class AccountRepository {
 
         return studentMapper.accountFromDocument(snapshot);
     }
-    }
+}
 
 

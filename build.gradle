@@ -50,12 +50,3 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
-
-// Open java.time.chrono for reflective access (fixes "Unable to make private java.time.chrono.IsoChronology() accessible" on Java 17+)
-tasks.named('bootRun', org.springframework.boot.gradle.tasks.run.BootRun) {
-    jvmArgs = ['--add-opens=java.base/java.time.chrono=ALL-UNNAMED']
-}
-
-tasks.withType(Test) {
-    jvmArgs += ['--add-opens=java.base/java.time.chrono=ALL-UNNAMED']
-}
