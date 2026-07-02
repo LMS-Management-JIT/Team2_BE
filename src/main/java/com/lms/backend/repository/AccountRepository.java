@@ -3,6 +3,7 @@ package com.lms.backend.repository;
 import com.google.api.core.ApiFuture;
 import com.google.cloud.firestore.*;
 import com.lms.backend.entity.AccountEntity;
+import com.lms.backend.mapper.StudentMapper;
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
@@ -114,5 +115,19 @@ public class AccountRepository {
         });
 
         return future.get();
+    }
+
+    @Autowired private
+    StudentMapper studentMapper;
+    public AccountEntity findEntityById(String id)
+            throws ExecutionException, InterruptedException {
+
+        DocumentSnapshot snapshot = findById(id);
+
+        if (!snapshot.exists()) {
+            return null;
+        }
+
+        return studentMapper.accountFromDocument(snapshot);
     }
 }
