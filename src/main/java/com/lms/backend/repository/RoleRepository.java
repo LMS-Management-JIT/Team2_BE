@@ -37,8 +37,12 @@ public class RoleRepository {
 
         ApiFuture<String> future = firestore.runTransaction(transaction -> {
             transaction.set(docRef, role);
-            return docRef.getId();
-        });
+                    transaction.update(docRef,
+                            "createDate", java.time.Instant.now(),
+                            "updateDate", java.time.Instant.now()
+                    );
+                    return docRef.getId();
+                });
 
         return future.get();
     }

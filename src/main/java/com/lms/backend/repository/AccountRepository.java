@@ -33,8 +33,12 @@ public class AccountRepository {
 
         firestore.runTransaction(transaction -> {
             transaction.set(docRef, account);
-            return null;
-        }).get();
+                    transaction.update(docRef,
+                            "createDate", java.time.Instant.now(),
+                            "updateDate", java.time.Instant.now()
+                    );
+                    return null;
+                }).get();
 
         return docRef.getId();
     }

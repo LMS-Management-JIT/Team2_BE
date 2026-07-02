@@ -1,13 +1,14 @@
 package com.lms.backend.entity;
 
 import com.google.cloud.firestore.annotation.DocumentId;
+import com.google.cloud.firestore.annotation.Exclude;
 import com.google.cloud.firestore.annotation.PropertyName;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 
 @Data
 @Builder
@@ -27,8 +28,9 @@ public class RoleEntity {
     @PropertyName("update_by")
     private String updateBy;
 
-    private Instant createDate;
-    private Instant updateDate;
+    @Exclude
+    private LocalDateTime createDate;
+    @Exclude private LocalDateTime updateDate;
 
 
 

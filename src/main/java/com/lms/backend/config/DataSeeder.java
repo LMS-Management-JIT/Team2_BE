@@ -11,6 +11,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -45,8 +46,7 @@ public class DataSeeder {
                     .name("ADMIN")
                     .deleted(false)
                     .createdBy("system")
-                    .createDate(java.time.Instant.now())
-                    .updateDate(java.time.Instant.now())
+                    .createDate(java.time.LocalDateTime.now())
                     .build();
             String id = roleRepository.save(admin);
             log.info("Created role ADMIN with id={}", id);
@@ -56,8 +56,7 @@ public class DataSeeder {
                     .name("TEACHER")
                     .deleted(false)
                     .createdBy("system")
-                    .createDate(java.time.Instant.now())
-                    .updateDate(java.time.Instant.now())
+                    .createDate(java.time.LocalDateTime.now())
                     .build();
             String id = roleRepository.save(teacher);
             log.info("Created role TEACHER with id={}", id);
@@ -67,8 +66,7 @@ public class DataSeeder {
                     .name("STUDENT")
                     .deleted(false)
                     .createdBy("system")
-                    .createDate(java.time.Instant.now())
-                    .updateDate(java.time.Instant.now())
+                    .createDate(java.time.LocalDateTime.now())
                     .build();
             String id = roleRepository.save(student);
             log.info("Created role STUDENT with id={}", id);
@@ -98,8 +96,8 @@ public class DataSeeder {
                     .name("ADMIN")
                     .deleted(false)
                     .createdBy("system")
-                    .createDate(java.time.Instant.now())
-                    .updateDate(java.time.Instant.now())
+                    .createDate(LocalDateTime.now())
+                    .updateDate(LocalDateTime.now())
                     .build();
             adminRoleId = roleRepository.save(adminRole);
         }
@@ -111,8 +109,8 @@ public class DataSeeder {
                 .status("ACTIVE")
                 .deleted(false)
                 .createdBy("system")
-                .createDate(java.time.Instant.now())
-                .updateDate(java.time.Instant.now())
+                .createDate(LocalDateTime.now())
+                .updateDate(LocalDateTime.now())
                 .build();
 
         String accountId = accountRepository.save(admin);
