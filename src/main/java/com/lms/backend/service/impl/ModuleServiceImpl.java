@@ -1,11 +1,11 @@
 package com.lms.backend.service.impl;
 
-import com.lms.backend.dto.request.ModuleRequestDto;
-import com.lms.backend.dto.response.ModuleResponseDto;
+import com.lms.backend.dto.request.ModuleRequest;
+import com.lms.backend.dto.response.ModuleResponse;
 import com.lms.backend.entity.ModuleEntity;
 import com.lms.backend.mapper.ModuleMapper;
 import com.lms.backend.repository.ModuleRepository;
-import com.lms.backend.service.ModuleService;
+import com.lms.backend.service.IModuleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
@@ -15,20 +15,23 @@ import java.util.concurrent.ExecutionException;
 
 @Service
 @RequiredArgsConstructor
-public class ModuleServiceImpl implements ModuleService {
+
+public class ModuleServiceImpl implements IModuleService {
 
     private final ModuleRepository moduleRepository;
     private final ModuleMapper mapper;
 
+
     @Override
-    public List<ModuleResponseDto> getAllActiveModules() throws ExecutionException, InterruptedException {
+    public List<ModuleResponse> getAllActiveModules() throws ExecutionException, InterruptedException {
         return moduleRepository.findAllActive().stream()
-                .map(mapper::toResponseDto)
+                .map(mapper::toResponse)
                 .toList(); // Tối ưu hóa Java 21 (.toList() thay thế Collectors.toList())
     }
 
+
     @Override
-    public ModuleResponseDto createModule(ModuleRequestDto requestDto, String creatorId) throws ExecutionException, InterruptedException {
+    public ModuleResponse createModule(ModuleRequest requestDto, String creatorId) throws ExecutionException, InterruptedException {
         String uniqueId = UUID.randomUUID().toString();
 
         ModuleEntity entity = ModuleEntity.builder()
@@ -42,11 +45,11 @@ public class ModuleServiceImpl implements ModuleService {
                 .build();
 
         moduleRepository.save(entity);
-        return mapper.toResponseDto(entity);
+        return mapper.toResponse(entity);
     }
 
     @Override
-    public ModuleResponseDto updateModule(String id, ModuleRequestDto requestDto, String updaterId) throws ExecutionException, InterruptedException {
+    public ModuleResponse updateModule(String id, ModuleRequest requestDto, String updaterId) throws ExecutionException, InterruptedException {
         ModuleEntity entity = moduleRepository.findById(id);
         if (entity == null || entity.isDeleted()) {
             throw new IllegalArgumentException("module không tồn tại hoặc đã bị xóa!");
@@ -59,7 +62,7 @@ public class ModuleServiceImpl implements ModuleService {
         entity.setUpdateBy(updaterId);
 
         moduleRepository.save(entity);
-        return mapper.toResponseDto(entity);
+        return mapper.toResponse(entity);
     }
 
     @Override
@@ -75,4 +78,8 @@ public class ModuleServiceImpl implements ModuleService {
 
         moduleRepository.save(entity);
     }
-}
+    @Override
+        public long countModules () throws Exception {
+            return moduleRepository.countActive();
+        }
+    }

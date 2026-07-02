@@ -1,6 +1,6 @@
 package com.lms.backend.dto.response;
 
-public record ModuleResponseDto(
+public record ModuleResponse(
         String id,
         String moduleName,
         String moduleCode,

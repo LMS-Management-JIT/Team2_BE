@@ -14,12 +14,13 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 @Repository
-@RequiredArgsConstructor // Tự động Inject Bean Firestore vào constructor
+@RequiredArgsConstructor // Tự động Inject Bean Firestore vào constructor (chỉ giữ lại 1 cái)
 public class ModuleRepository {
 
-    private final Firestore firestore; // Sử dụng trực tiếp Bean do FirebaseConfig cung cấp
+    private final Firestore firestore;
     private static final String COLLECTION_NAME = "modules";
 
+    // 1. Hàm lấy danh sách học phần đang hoạt động
     public List<ModuleEntity> findAllActive() throws ExecutionException, InterruptedException {
         List<QueryDocumentSnapshot> documents = firestore.collection(COLLECTION_NAME)
                 .whereEqualTo("deleted", false)
@@ -35,14 +36,23 @@ public class ModuleRepository {
                     .deleted(doc.getBoolean("deleted") != null && doc.getBoolean("deleted"))
                     .createdBy(doc.getString("created_by"))
                     .updateBy(doc.getString("update_by"))
-                    .createDate(ModuleMapper.toLocalDateTime(doc.getTimestamp("create_date")))
-                    .updateDate(ModuleMapper.toLocalDateTime(doc.getTimestamp("update_date")))
+                    .createDate(ModuleMapper.toLocalDateTime(doc.getTimestamp("create_date"))) // Đã fix sang toInstant
+                    .updateDate(ModuleMapper.toLocalDateTime(doc.getTimestamp("update_date"))) // Đã fix sang toInstant
                     .build();
             modules.add(entity);
         }
         return modules;
     }
 
+    // 2. Hàm đếm số lượng học phần hoạt động (Mới merge từ develop về được dọn dẹp chuẩn chỉnh)
+    public long countActive() throws ExecutionException, InterruptedException {
+        return firestore.collection(COLLECTION_NAME)
+                .whereEqualTo("deleted", false)
+                .get().get()
+                .size();
+    }
+
+    // 3. Tìm kiếm học phần theo ID
     public ModuleEntity findById(String id) throws ExecutionException, InterruptedException {
         var docRef = firestore.collection(COLLECTION_NAME).document(id).get().get();
         if (!docRef.exists()) return null;
@@ -55,11 +65,12 @@ public class ModuleRepository {
                 .deleted(docRef.getBoolean("deleted") != null && docRef.getBoolean("deleted"))
                 .createdBy(docRef.getString("created_by"))
                 .updateBy(docRef.getString("update_by"))
-                .createDate(ModuleMapper.toLocalDateTime(docRef.getTimestamp("create_date")))
-                .updateDate(ModuleMapper.toLocalDateTime(docRef.getTimestamp("update_date")))
+                .createDate(ModuleMapper.toLocalDateTime(docRef.getTimestamp("create_date"))) // Đã fix sang toInstant
+                .updateDate(ModuleMapper.toLocalDateTime(docRef.getTimestamp("update_date"))) // Đã fix sang toInstant
                 .build();
     }
 
+    // 4. Lưu hoặc Cập nhật học phần
     public void save(ModuleEntity entity) throws ExecutionException, InterruptedException {
         Map<String, Object> data = new HashMap<>();
         data.put("module_name", entity.getModuleName());

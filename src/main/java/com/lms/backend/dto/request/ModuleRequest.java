@@ -2,7 +2,7 @@ package com.lms.backend.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 
-public record ModuleRequestDto(
+public record ModuleRequest(
         @NotBlank(message = "Tên module  không được để trống")
         String moduleName,
 

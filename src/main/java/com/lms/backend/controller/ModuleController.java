@@ -1,8 +1,8 @@
 package com.lms.backend.controller;
 
-import com.lms.backend.dto.request.ModuleRequestDto;
-import com.lms.backend.dto.response.ModuleResponseDto;
-import com.lms.backend.service.ModuleService;
+import com.lms.backend.dto.request.ModuleRequest;
+import com.lms.backend.dto.response.ModuleResponse;
+import com.lms.backend.service.IModuleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -18,7 +18,7 @@ import java.util.concurrent.ExecutionException;
 @RequiredArgsConstructor
 public class ModuleController {
 
-    private final ModuleService moduleService;
+    private final IModuleService moduleService;
 
     // Tự động bóc tách Name/UID từ Token đã authenticate qua SecurityConfig
     private String getCurrentUserId() {
@@ -26,27 +26,27 @@ public class ModuleController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER', 'STUDENT')")
-    public ResponseEntity<List<ModuleResponseDto>> getAllModules() throws ExecutionException, InterruptedException {
-        List<ModuleResponseDto> list = moduleService.getAllActiveModules();
+    //@PreAuthorize("hasAnyRole('ADMIN', 'TEACHER', 'STUDENT')")
+    public ResponseEntity<List<ModuleResponse>> getAllModules() throws ExecutionException, InterruptedException {
+        List<ModuleResponse> list = moduleService.getAllActiveModules();
         return ResponseEntity.ok(list);
     }
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ModuleResponseDto> createModule(@Valid @RequestBody ModuleRequestDto requestDto) throws ExecutionException, InterruptedException {
+    public ResponseEntity<ModuleResponse> createModule(@Valid @RequestBody ModuleRequest request) throws ExecutionException, InterruptedException {
         String currentUserId = getCurrentUserId();
-        ModuleResponseDto savedModule = moduleService.createModule(requestDto, currentUserId);
+        ModuleResponse savedModule = moduleService.createModule(request, currentUserId);
         return ResponseEntity.status(HttpStatus.CREATED).body(savedModule);
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public ResponseEntity<ModuleResponseDto> updateModule(
+    public ResponseEntity<ModuleResponse> updateModule(
             @PathVariable String id,
-            @Valid @RequestBody ModuleRequestDto requestDto) throws ExecutionException, InterruptedException {
+            @Valid @RequestBody ModuleRequest request) throws ExecutionException, InterruptedException {
         String currentUserId = getCurrentUserId();
-        ModuleResponseDto updatedModule = moduleService.updateModule(id, requestDto, currentUserId);
+        ModuleResponse updatedModule = moduleService.updateModule(id, request, currentUserId);
         return ResponseEntity.ok(updatedModule);
     }
 

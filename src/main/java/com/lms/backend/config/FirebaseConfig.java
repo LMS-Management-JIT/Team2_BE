@@ -1,6 +1,7 @@
 package com.lms.backend.config;
 
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.Timestamp;
 import com.google.cloud.firestore.Firestore;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
@@ -8,16 +9,18 @@ import com.google.firebase.cloud.FirestoreClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.convert.converter.Converter;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.LocalDateTime;
 
 @Configuration
 public class FirebaseConfig {
 
-    @Value("${firebase.service-account-path:$classpath:firebase-service-account.json}")
+    @Value("${firebase.service-account-path:classpath:firebase-service-account.json}")
     private String serviceAccountPath;
 
     private final ResourceLoader resourceLoader;
@@ -25,8 +28,6 @@ public class FirebaseConfig {
     public FirebaseConfig(ResourceLoader resourceLoader) {
         this.resourceLoader = resourceLoader;
     }
-
-
 
     @Bean
     public Firestore firestore() throws IOException {
@@ -37,15 +38,11 @@ public class FirebaseConfig {
                     .setCredentials(GoogleCredentials.fromStream(serviceAccount))
                     .build();
 
-            // Khởi tạo Firebase nếu chưa có
             if (FirebaseApp.getApps().isEmpty()) {
                 FirebaseApp.initializeApp(options);
-                System.out.println("✅ Firebase Admin SDK đã khởi tạo thành công!");
+                System.out.println("Firebase Admin SDK started");
             }
-
-            // Trả về đối tượng Firestore cho Spring Boot quản lý như một Bean
             return FirestoreClient.getFirestore();
         }
     }
 }
-
