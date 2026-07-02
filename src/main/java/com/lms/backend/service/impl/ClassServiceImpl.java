@@ -1,4 +1,4 @@
-package com.lms.backend.service;
+package com.lms.backend.service.impl;
 
 import com.lms.backend.dto.request.ClassRequest;
 import com.lms.backend.dto.response.ClassDetailResponse;
@@ -6,18 +6,18 @@ import com.lms.backend.dto.response.ClassResponse;
 import com.lms.backend.entity.ClassEntity;
 import com.lms.backend.mapper.ClassMapper;
 import com.lms.backend.repository.ClassRepository;
+import com.lms.backend.service.IClassService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 @Service
-public class ClassService implements IClassService {
+public class ClassServiceImpl implements IClassService {
 
     @Autowired
     private ClassRepository classRepository;

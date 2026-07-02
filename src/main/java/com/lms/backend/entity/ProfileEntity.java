@@ -1,6 +1,7 @@
 package com.lms.backend.entity;
 
 import com.google.cloud.firestore.annotation.DocumentId;
+import com.google.cloud.firestore.annotation.Exclude;
 import com.google.cloud.firestore.annotation.PropertyName;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,13 +24,13 @@ public class ProfileEntity {
     @PropertyName("address")
     private String address;
 
-    @PropertyName("create_date")
+    @Exclude
     private LocalDateTime createDate;
 
     @PropertyName("create_by")
     private String createdBy;
 
-    @PropertyName("day_of_birth")
+    @Exclude
     private LocalDateTime dayOfBirth;
 
     private Boolean deleted;
@@ -42,7 +43,7 @@ public class ProfileEntity {
     @PropertyName("phone_number")
     private String phoneNumber;
 
-    @PropertyName("update_date")
+    @Exclude
     private LocalDateTime updateDate;
 
     @PropertyName("update_by")
