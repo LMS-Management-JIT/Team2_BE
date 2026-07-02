@@ -27,6 +27,7 @@ public class ClassServiceImpl implements IClassService {
 
     @Override
     public String createClass(ClassRequest request) throws ExecutionException, InterruptedException {
+
         ClassEntity entity = classMapper.toEntity(request);
         entity.setStartDateClass(request.getStartDateClass());
         entity.setCreateDate(LocalDateTime.now());

@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -80,6 +81,7 @@ public class AuthServiceImpl implements IAuthService {
         log.info("User " + username + " logged out");
     }
 
+    @SneakyThrows
     @Override
     public UserResponse getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -105,7 +107,7 @@ public class AuthServiceImpl implements IAuthService {
         response.setId(account.getId());
         response.setUsername(account.getEmail());
         response.setEmail(account.getEmail());
-        response.setRole(account.getRoleId());
+        response.setRole(String.valueOf(roleRepository.findById(account.getRoleId())));
         response.setCreatedAt(account.getCreateDate());
         return response;
     }
