@@ -2,8 +2,8 @@ firebase:
   service-account-path: ${FIREBASE_SERVICE_ACCOUNT:classpath:firebase-service-account.json}
 
 jwt:
-  secret: ${JWT_SECRET}
-  expiration: ${JWT_EXPIRATION}
+  secret: ${JWT_SECRET:VGhpcyBpcyBhIHZlcnkgc2VjdXJlIHNlY3JldCBrZXkgZm9yIEpXVA}
+  expiration: ${JWT_EXPIRATION:3600000}
 server:
   port : ${PORT:1010}
 

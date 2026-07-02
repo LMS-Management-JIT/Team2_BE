@@ -3,6 +3,7 @@ package com.lms.backend.repository;
 import com.google.api.core.ApiFuture;
 import com.google.cloud.firestore.*;
 import com.lms.backend.entity.AccountEntity;
+import com.lms.backend.mapper.AccountMapper;
 import com.lms.backend.mapper.StudentMapper;
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,10 +19,18 @@ import java.util.concurrent.ExecutionException;
 @Repository
 public class AccountRepository {
 
-    @Autowired
-    private Firestore firestore;
+    private final Firestore firestore;
 
     private static final String COLLECTION = "accounts";
+
+    private final AccountMapper accountMapper;
+
+
+    public AccountRepository(Firestore firestore, AccountMapper accountMapper) {
+        this.firestore = firestore;
+        this.accountMapper = accountMapper;
+    }
+
 
     public CollectionReference getAccountCollection() {
         return firestore.collection("accounts");
@@ -31,90 +40,90 @@ public class AccountRepository {
     public String save(AccountEntity account) throws Exception {
         DocumentReference docRef = firestore.collection(COLLECTION).document();
         account.setId(docRef.getId());
-
-        firestore.runTransaction(transaction -> {
-            transaction.set(docRef, account);
-            return null;
-        }).get();
-
-        return docRef.getId();
+        ApiFuture<String> transactionResult = firestore.runTransaction(transaction -> {
+            Map<String, Object> dataToSave = accountMapper.toFirestoreMap(account);
+            transaction.set(docRef, dataToSave);
+            return docRef.getId();
+        });
+        return transactionResult.get();
     }
-    public Optional<AccountEntity> findByUsername(String username) {
-        try {
-            ApiFuture<QuerySnapshot> future = getAccountCollection()
-                    .whereEqualTo("email", username)
-                    .whereEqualTo("deleted", false)
-                    .limit(1)
-                    .get();
+        public Optional<AccountEntity> findByUsername (String username){
+            try {
+                ApiFuture<QuerySnapshot> future = getAccountCollection()
+                        .whereEqualTo("email", username)
+                        .whereEqualTo("deleted", false)
+                        .limit(1)
+                        .get();
 
-            for (QueryDocumentSnapshot doc : future.get().getDocuments()) {
-                AccountEntity account = doc.toObject(AccountEntity.class);
-                account.setId(doc.getId());
-                return Optional.of(account);
+                for (QueryDocumentSnapshot doc : future.get().getDocuments()) {
+                    AccountEntity account = accountMapper.fromDocument(doc);
+                    if (account != null) account.setId(doc.getId());
+                    return Optional.ofNullable(account);
+                }
+
+                return Optional.empty();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Failed to search account by username", e);
+            } catch (ExecutionException e) {
+                throw new RuntimeException("Failed to search account by username", e);
             }
-
-            return Optional.empty();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Failed to search account by username", e);
-        } catch (ExecutionException e) {
-            throw new RuntimeException("Failed to search account by username", e);
         }
-    }
 
-    public DocumentSnapshot findById(String id)
+        public DocumentSnapshot findById (String id)
             throws ExecutionException, InterruptedException {
 
-        return firestore.collection(COLLECTION)
-                .document(id)
-                .get()
-                .get();
-    }
+            return firestore.collection(COLLECTION)
+                    .document(id)
+                    .get()
+                    .get();
+        }
 
-    public List<QueryDocumentSnapshot> findAllActive()
+        public List<QueryDocumentSnapshot> findAllActive ()
             throws ExecutionException, InterruptedException {
 
-        return firestore.collection(COLLECTION)
-                .whereEqualTo("deleted", false)
-                .get()
-                .get()
-                .getDocuments();
-    }
+            return firestore.collection(COLLECTION)
+                    .whereEqualTo("deleted", false)
+                    .get()
+                    .get()
+                    .getDocuments();
+        }
 
-    public String update(String accountId, Map<String, Object> updates)
+        public String update (String accountId, Map < String, Object > updates)
             throws ExecutionException, InterruptedException {
 
-        DocumentReference docRef =
-                firestore.collection("accounts").document(accountId);
+            DocumentReference docRef =
+                    firestore.collection("accounts").document(accountId);
 
-        ApiFuture<String> future = firestore.runTransaction(transaction -> {
+            ApiFuture<String> future = firestore.runTransaction(transaction -> {
 
-            transaction.update(docRef, updates);
+                transaction.update(docRef, updates);
 
-            return "Update thành công";
-        });
+                return "Update thành công";
+            });
 
-        return future.get();
-    }
+            return future.get();
+        }
 
-    public String softDelete(String accountId, String deletedBy)
+        public String softDelete (String accountId, String deletedBy)
             throws ExecutionException, InterruptedException {
 
-        DocumentReference docRef =
-                firestore.collection("accounts").document(accountId);
+            DocumentReference docRef =
+                    firestore.collection("accounts").document(accountId);
 
-        ApiFuture<String> future = firestore.runTransaction(transaction -> {
+            ApiFuture<String> future = firestore.runTransaction(transaction -> {
 
-            transaction.update(docRef,
-                    "deleted", true,
-                    "updateDate", Instant.now(),
-                    "updateBy", deletedBy
-            );
+                transaction.update(docRef,
+                        "deleted", true,
+                        "update_date", Instant.now(),
+                        "update_by", deletedBy
+                );
 
-            return "Đã xóa mềm";
-        });
+                return "Đã xóa mềm";
+            });
 
-        return future.get();
+            return future.get();
+        }
     }
 
     @Autowired private
