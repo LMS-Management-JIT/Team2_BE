@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -14,4 +16,5 @@ public class DashboardResponse {
     private long totalClasses;
     private long totalStudents;
     private long totalTeachers;
+    private List<HistoryResponse> recentHistories;
 }
