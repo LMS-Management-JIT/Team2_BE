@@ -5,80 +5,69 @@ import com.lms.backend.dto.response.ClassDetailResponse;
 import com.lms.backend.dto.response.ClassResponse;
 import com.lms.backend.service.IClassService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/classes")
+@CrossOrigin("*")
+@RequiredArgsConstructor
 public class ClassController {
 
-    @Autowired
-    private IClassService classService;
+    private final IClassService classService;
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> createClass(@Valid @RequestBody ClassRequest request) {
-        try {
-            String id = classService.createClass(request);
-            return ResponseEntity.status(HttpStatus.CREATED).body("Tạo thành công Lớp với ID: " + id);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Lỗi hệ thống: " + e.getMessage());
-        }
+    public ResponseEntity<String> createClass(@Valid @RequestBody ClassRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body("Tạo thành công Lớp với ID: " + classService.createClass(request));
     }
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER', 'STUDENT')")
-    public ResponseEntity<?> getAllClasses() {
-        try {
-            List<ClassResponse> classes = classService.getAllClasses();
-            return ResponseEntity.ok(classes);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Lỗi hệ thống: " + e.getMessage());
-        }
+    public ResponseEntity<List<ClassResponse>> getAllClasses() {
+        return ResponseEntity.ok(classService.getAllClasses());
     }
 
-    // NEW: API LẤY CHI TIẾT LỚP HỌC
-    @GetMapping("/{id}/detail")
+    @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER', 'STUDENT')")
-    public ResponseEntity<?> getClassDetail(@PathVariable String id) {
-        try {
-            ClassDetailResponse detail = classService.getClassDetail(id);
-            return ResponseEntity.ok(detail);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Lỗi hệ thống: " + e.getMessage());
-        }
+    public ResponseEntity<ClassDetailResponse> getClassDetail(@PathVariable String id) {
+        return ResponseEntity.ok(classService.getClassDetail(id));
+    }
+
+    @GetMapping("/{id}/course")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER', 'STUDENT')")
+    public ResponseEntity<Map<String, Object>> getCourseOfClass(@PathVariable String id) {
+        return ResponseEntity.ok(classService.getCourseOfClass(id));
+    }
+
+    @GetMapping("/{id}/students")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER', 'STUDENT')")
+    public ResponseEntity<List<Map<String, Object>>> getStudentsOfClass(@PathVariable String id) {
+        return ResponseEntity.ok(classService.getStudentsOfClass(id));
+    }
+
+    @GetMapping("/{id}/teachers")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER', 'STUDENT')")
+    public ResponseEntity<List<Map<String, Object>>> getTeachersOfClass(@PathVariable String id) {
+        return ResponseEntity.ok(classService.getTeachersOfClass(id));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public ResponseEntity<?> updateClass(@PathVariable String id, @Valid @RequestBody ClassRequest request) {
-        try {
-            String result = classService.updateClass(id, request);
-            return ResponseEntity.ok(result);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Lỗi hệ thống: " + e.getMessage());
-        }
+    public ResponseEntity<String> updateClass(@PathVariable String id, @Valid @RequestBody ClassRequest request) {
+        return ResponseEntity.ok(classService.updateClass(id, request));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> deleteClass(@PathVariable String id, @RequestParam String deletedBy) {
-        try {
-            String result = classService.deleteClass(id, deletedBy);
-            return ResponseEntity.ok(result);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Lỗi hệ thống: " + e.getMessage());
-        }
+    public ResponseEntity<String> deleteClass(@PathVariable String id, @RequestParam String deletedBy) {
+        return ResponseEntity.ok(classService.deleteClass(id, deletedBy));
     }
 }

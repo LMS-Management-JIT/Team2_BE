@@ -5,17 +5,24 @@ import com.lms.backend.dto.response.ClassDetailResponse;
 import com.lms.backend.dto.response.ClassResponse;
 
 import java.util.List;
-import java.util.concurrent.ExecutionException;
+import java.util.Map;
 
 public interface IClassService {
-    String createClass(ClassRequest request) throws ExecutionException, InterruptedException;
-    List<ClassResponse> getAllClasses() throws ExecutionException, InterruptedException;
+    String createClass(ClassRequest request);
 
-    ClassDetailResponse getClassDetail(String classId) throws ExecutionException, InterruptedException;
+    List<ClassResponse> getAllClasses();
 
-    String updateClass(String classId, ClassRequest request) throws ExecutionException, InterruptedException;
-    String deleteClass(String classId, String deletedBy) throws ExecutionException, InterruptedException;
+    ClassDetailResponse getClassDetail(String classId);
 
-    long countClasses() throws Exception;
+    Map<String, Object> getCourseOfClass(String classId);
 
+    List<Map<String, Object>> getStudentsOfClass(String classId);
+
+    List<Map<String, Object>> getTeachersOfClass(String classId);
+
+    String updateClass(String classId, ClassRequest request);
+
+    String deleteClass(String classId, String deletedBy);
+
+    long countClasses();
 }
