@@ -124,7 +124,6 @@ public class AccountRepository {
 
             return future.get();
         }
-    }
 
     @Autowired private
     StudentMapper studentMapper;
@@ -139,4 +138,6 @@ public class AccountRepository {
 
         return studentMapper.accountFromDocument(snapshot);
     }
-}
+    }
+
+
