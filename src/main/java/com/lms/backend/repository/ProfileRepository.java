@@ -21,7 +21,7 @@ public class ProfileRepository {
     @Autowired
     private StudentMapper studentMapper;
 
-    private CollectionReference getProfileCollection() {
+    public CollectionReference getProfileCollection() {
         return firestore.collection("profiles");
     }
 

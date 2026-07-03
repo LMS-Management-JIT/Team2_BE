@@ -154,39 +154,39 @@ public class StudentServiceImpl implements IStudentService {
 
             return firestore.runTransaction(transaction -> {
 
+                // Account
                 DocumentReference accountRef =
-                        firestore.collection("accounts").document();
+                        accountRepository.getAccountCollection().document();
                 account.setId(accountRef.getId());
                 transaction.set(
                         accountRef,
                         studentMapper.accountToFirestoreMap(account)
                 );
 
+                // Profile
                 DocumentReference profileRef =
-                        firestore.collection("profiles").document();
+                        profileRepository.getProfileCollection().document();
                 profile.setId(profileRef.getId());
                 profile.setAccountId(account.getId());
                 transaction.set(
                         profileRef,
                         studentMapper.profileToFirestoreMap(profile)
                 );
-                DocumentReference studentRef =
-                        firestore.collection("students").document();
 
+                // Student
+                DocumentReference studentRef =
+                        studentRepository.getStudentCollection().document();
                 student.setId(studentRef.getId());
                 student.setProfileId(profile.getId());
-
                 transaction.set(
                         studentRef,
                         studentMapper.studentToFirestoreMap(student)
                 );
-
                 return student.getId();
-
             }).get();
-
         }, "Lỗi hệ thống khi tạo học viên");
     }
+
     @Override
     public List<StudentResponse> getAllStudents() {
         return executeWithCatch(() -> {
@@ -254,17 +254,17 @@ public class StudentServiceImpl implements IStudentService {
 
             return firestore.runTransaction(transaction -> {
                 transaction.set(
-                        firestore.collection("accounts")
+                        accountRepository.getAccountCollection()
                                 .document(account.getId()),
                         studentMapper.accountToFirestoreMap(account),
                         SetOptions.merge());
                 transaction.set(
-                        firestore.collection("profiles")
+                        profileRepository.getProfileCollection()
                                 .document(profile.getId()),
                         studentMapper.profileToFirestoreMap(profile),
                         SetOptions.merge());
                 transaction.set(
-                        firestore.collection("students")
+                        studentRepository.getStudentCollection()
                                 .document(student.getId()),
                         studentMapper.studentToFirestoreMap(student),
                         SetOptions.merge());
@@ -292,17 +292,17 @@ public class StudentServiceImpl implements IStudentService {
 
             return firestore.runTransaction(transaction -> {
                 transaction.set(
-                        firestore.collection("accounts")
+                        accountRepository.getAccountCollection()
                                 .document(account.getId()),
                         studentMapper.accountToFirestoreMap(account),
                         SetOptions.merge());
                 transaction.set(
-                        firestore.collection("profiles")
+                        profileRepository.getProfileCollection()
                                 .document(profile.getId()),
                         studentMapper.profileToFirestoreMap(profile),
                         SetOptions.merge());
                 transaction.set(
-                        firestore.collection("students")
+                        studentRepository.getStudentCollection()
                                 .document(student.getId()),
                         studentMapper.studentToFirestoreMap(student),
                         SetOptions.merge());

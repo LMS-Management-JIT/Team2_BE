@@ -21,7 +21,7 @@ public class StudentRepository {
 
     private final Firestore firestore;
 
-    private CollectionReference getStudentCollection() {
+    public CollectionReference getStudentCollection() {
         return firestore.collection("students");
     }
 
