@@ -22,17 +22,23 @@ public class StudentMapper {
 
     public AccountEntity toAccountEntity(StudentRequest request) {
 
-        if (request == null) return null;
+        LocalDateTime now = LocalDateTime.now();
 
         return AccountEntity.builder()
                 .email(request.getEmail())
+                .status("ACTIVE")
+                .deleted(false)
+                .createdBy(request.getRequestedBy())
+                .updateBy(request.getRequestedBy())
+                .createDate(now)
+                .updateDate(now)
                 .build();
     }
 
 
     public ProfileEntity toProfileEntity(StudentRequest request) {
 
-        if (request == null) return null;
+        LocalDateTime now = LocalDateTime.now();
 
         return ProfileEntity.builder()
                 .fullName(request.getFullName())
@@ -40,14 +46,17 @@ public class StudentMapper {
                 .dayOfBirth(request.getDayOfBirth())
                 .gender(request.getGender())
                 .address(request.getAddress())
+                .deleted(false)
+                .createdBy(request.getRequestedBy())
+                .updatedBy(request.getRequestedBy())
+                .createDate(now)
+                .updateDate(now)
                 .build();
     }
 
 
     public StudentEntity toStudentEntity(StudentRequest request) {
-
-        if (request == null) return null;
-
+        LocalDateTime now = LocalDateTime.now();
         return StudentEntity.builder()
                 .identityNumber(request.getIdentityNumber())
                 .issueDate(request.getIssueDate())
@@ -56,6 +65,12 @@ public class StudentMapper {
                 .interviewContent(request.getInterviewContent())
                 .admissionResult(request.getAdmissionResult())
                 .description(request.getDescription())
+                .status("ACTIVE")
+                .deleted(false)
+                .createdBy(request.getRequestedBy())
+                .updatedBy(request.getRequestedBy())
+                .createDate(now)
+                .updateDate(now)
                 .build();
     }
 
@@ -222,10 +237,8 @@ public class StudentMapper {
         map.put("role_id", entity.getRoleId());
         map.put("status", entity.getStatus());
         map.put("deleted", entity.getDeleted());
-
         map.put("created_by", entity.getCreatedBy());
         map.put("update_by", entity.getUpdateBy());
-
         map.put("create_date", toTimestamp(entity.getCreateDate()));
         map.put("update_date", toTimestamp(entity.getUpdateDate()));
 
@@ -241,18 +254,13 @@ public class StudentMapper {
 
         map.put("account_id", entity.getAccountId());
         map.put("address", entity.getAddress());
-
         map.put("full_name", entity.getFullName());
         map.put("phone_number", entity.getPhoneNumber());
         map.put("gender", entity.getGender());
-
         map.put("day_of_birth", toTimestamp(entity.getDayOfBirth()));
-
         map.put("deleted", entity.getDeleted());
-
         map.put("create_by", entity.getCreatedBy());
         map.put("update_by", entity.getUpdatedBy());
-
         map.put("create_date", toTimestamp(entity.getCreateDate()));
         map.put("update_date", toTimestamp(entity.getUpdateDate()));
 
@@ -265,38 +273,23 @@ public class StudentMapper {
         if (entity == null) return null;
 
         Map<String, Object> map = new HashMap<>();
-
         map.put("profile_id", entity.getProfileId());
-
         map.put("identity_number", entity.getIdentityNumber());
-
         map.put("issue_date", toTimestamp(entity.getIssueDate()));
-
         map.put("issue_place", entity.getIssuePlace());
-
         map.put("education_level", entity.getEducationLevel());
-
         map.put("interview_content", entity.getInterviewContent());
-
         map.put("admission_result", entity.getAdmissionResult());
-
         map.put("description", entity.getDescription());
-
         map.put("status", entity.getStatus());
-
         map.put("deleted", entity.getDeleted());
-
         map.put("created_by", entity.getCreatedBy());
-
         map.put("updated_by", entity.getUpdatedBy());
-
         map.put("create_date", toTimestamp(entity.getCreateDate()));
-
         map.put("update_date", toTimestamp(entity.getUpdateDate()));
 
         return map;
     }
-
 
     private Date toTimestamp(LocalDateTime localDateTime) {
 

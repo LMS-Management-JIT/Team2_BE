@@ -139,6 +139,41 @@ public class StudentRepository {
         return transactionResult.get();
     }
 
+    public List<String> getClassNamesByStudentId(String studentId)
+            throws ExecutionException, InterruptedException {
+
+        List<String> classNames = new ArrayList<>();
+
+        List<QueryDocumentSnapshot> relations = firestore
+                .collection("student_class")
+                .whereEqualTo("student_id", studentId)
+                .whereEqualTo("deleted", false)
+                .get()
+                .get()
+                .getDocuments();
+
+        for (QueryDocumentSnapshot relation : relations) {
+
+            String classId = relation.getString("class_id");
+
+            if (classId == null) {
+                continue;
+            }
+
+            DocumentSnapshot classDoc = firestore
+                    .collection("classes")
+                    .document(classId)
+                    .get()
+                    .get();
+
+            if (classDoc.exists()) {
+                classNames.add(classDoc.getString("class_name"));
+            }
+        }
+
+        return classNames;
+    }
+
 
 
 }

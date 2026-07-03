@@ -51,7 +51,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/login", "/api/auth/refresh").permitAll()
                                 .requestMatchers("/api/classes/**").authenticated()
-                        .requestMatchers("/api/auth/me", "/api/auth/logout", "/api/dashboard/**").authenticated()
+                        .requestMatchers("/api/auth/me", "/api/auth/logout", "/api/dashboard/**","/api/students/**").authenticated()
                                 .requestMatchers("/api/auth/me", "/api/auth/logout", "/api/modules/**").authenticated()
 //                        .requestMatchers("/api/packets/**").permitAll()
                         .anyRequest().authenticated()
