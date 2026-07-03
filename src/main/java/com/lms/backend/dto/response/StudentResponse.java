@@ -3,6 +3,7 @@ package com.lms.backend.dto.response;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class StudentResponse {
@@ -32,4 +33,6 @@ public class StudentResponse {
     private String admissionResult;
 
     private String status;
+
+    private List<String> classNames;
 }

@@ -9,6 +9,7 @@ import com.google.cloud.firestore.QueryDocumentSnapshot;
 import com.google.cloud.firestore.QuerySnapshot;
 import com.google.cloud.firestore.SetOptions;
 import com.lms.backend.entity.RoleEntity;
+import com.lms.backend.exception.ResourceNotFoundException;
 import com.lms.backend.mapper.RoleMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -103,5 +104,27 @@ public class RoleRepository {
         });
 
         return future.get();
+    }
+
+    public RoleEntity findByName(String roleName)
+            throws ExecutionException, InterruptedException {
+
+        QuerySnapshot snapshot = getRoleCollection()
+                .whereEqualTo("name", roleName)
+                .whereEqualTo("deleted", false)
+                .limit(1)
+                .get()
+                .get();
+
+        if (snapshot.isEmpty()) {
+            return null;
+        }
+
+        DocumentSnapshot doc = snapshot.getDocuments().get(0);
+
+        RoleEntity role = doc.toObject(RoleEntity.class);
+        role.setId(doc.getId());
+
+        return role;
     }
 }
