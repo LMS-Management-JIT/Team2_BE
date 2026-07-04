@@ -61,42 +61,14 @@ public class HistoryMapper {
             return null;
         }
         Map<String, Object> map = new HashMap<>();
-        map.put(
-                "action",
-                entity.getAction() != null
-                        ? entity.getAction().name()
-                        : null
-        );
-        map.put(
-                "actor_id",
-                entity.getActorId()
-        );
-        map.put(
-                "actor_name",
-                entity.getActorName()
-        );
-        map.put(
-                "changes",
-                entity.getChanges()
-        );
-        map.put(
-                "created_at",
-                toTimestamp(
-                        entity.getCreatedAt()
-                )
-        );
-        map.put(
-                "entity_id",
-                entity.getEntityId()
-        );
-        map.put(
-                "entity_name",
-                entity.getEntityName()
-        );
-        map.put(
-                "entity_type",
-                entity.getEntityType()
-        );
+        map.put("action", entity.getAction() != null ? entity.getAction().name() : null);
+        map.put("actor_id", entity.getActorId());
+        map.put("actor_name", entity.getActorName());
+        map.put("changes", entity.getChanges());
+        map.put("created_at", toTimestamp(entity.getCreatedAt()));
+        map.put("entity_id", entity.getEntityId());
+        map.put("entity_name", entity.getEntityName());
+        map.put("entity_type", entity.getEntityType());
         return map;
     }
 
