@@ -15,8 +15,7 @@ import java.util.Map;
 @Component
 public class HistoryMapper {
 
-    public HistoryResponse toHistoryResponse(
-            HistoryEntity entity) {
+    public HistoryResponse toHistoryResponse(HistoryEntity entity) {
         if (entity == null) {
             return null;
         }
@@ -33,8 +32,7 @@ public class HistoryMapper {
                 .build();
     }
 
-    public HistoryEntity fromDocument(
-            DocumentSnapshot doc) {
+    public HistoryEntity fromDocument(DocumentSnapshot doc) {
         if (doc == null || !doc.exists()) {
             return null;
         }
@@ -46,17 +44,12 @@ public class HistoryMapper {
                 .entityId(doc.getString("entity_id"))
                 .entityName(doc.getString("entity_name"))
                 .entityType(doc.getString("entity_type"))
-                .createdAt(
-                        toLocalDateTime(
-                                doc.getDate("created_at")
-                        )
-                )
+                .createdAt(toLocalDateTime(doc.getDate("created_at")))
                 .changes(extractChanges(doc))
                 .build();
     }
 
-    public Map<String, Object> toFirestoreMap(
-            HistoryEntity entity) {
+    public Map<String, Object> toFirestoreMap(HistoryEntity entity) {
         if (entity == null) {
             return null;
         }
@@ -72,8 +65,7 @@ public class HistoryMapper {
         return map;
     }
 
-    private ActionType getAction(
-            DocumentSnapshot doc) {
+    private ActionType getAction(DocumentSnapshot doc) {
         String action =
                 doc.getString("action");
         return action != null
@@ -84,10 +76,8 @@ public class HistoryMapper {
     @SuppressWarnings("unchecked")
     private Map<String, HistoryEntity.ChangeDetail>
     extractChanges(DocumentSnapshot doc) {
-        Map<String, HistoryEntity.ChangeDetail>
-                result = new HashMap<>();
-        Object rawChanges =
-                doc.get("changes");
+        Map<String, HistoryEntity.ChangeDetail> result = new HashMap<>();
+        Object rawChanges = doc.get("changes");
         if (!(rawChanges instanceof Map<?, ?> changes)) {
             return result;
         }
@@ -119,22 +109,16 @@ public class HistoryMapper {
                 .build();
     }
 
-    private Date toTimestamp(
-            LocalDateTime localDateTime) {
+    private Date toTimestamp(LocalDateTime localDateTime) {
         if (localDateTime == null) {
             return null;
         }
         return Date.from(
-                localDateTime
-                        .atZone(
-                                ZoneId.systemDefault()
-                        )
-                        .toInstant()
+                localDateTime.atZone(ZoneId.systemDefault()).toInstant()
         );
     }
 
-    private LocalDateTime toLocalDateTime(
-            Date date) {
+    private LocalDateTime toLocalDateTime(Date date) {
         if (date == null) {
             return null;
         }
