@@ -91,6 +91,18 @@ public class ClassMapper {
 
         if (entity != null) {
             entity.setId(doc.getId());
+            if (doc.contains("class_name")) {
+                entity.setClassName(doc.getString("class_name"));
+            }
+            if (doc.contains("course_id")) {
+                entity.setCourseId(doc.getString("course_id"));
+            }
+            if (doc.contains("created_by")) {
+                entity.setCreatedBy(doc.getString("created_by"));
+            }
+            if (doc.contains("update_by")) {
+                entity.setUpdateBy(doc.getString("update_by"));
+            }
             entity.setStartDateClass(toLocalDateTime(doc.getDate("start_date_class")));
             entity.setEndDateClass(toLocalDateTime(doc.getDate("end_date_class")));
             entity.setCreateDate(toLocalDateTime(doc.getDate("create_date")));
