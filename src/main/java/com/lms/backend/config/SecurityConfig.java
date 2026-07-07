@@ -50,10 +50,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/login", "/api/auth/refresh").permitAll()
-                                .requestMatchers("/api/classes/**").authenticated()
-                        .requestMatchers("/api/auth/me", "/api/auth/logout", "/api/dashboard/**","/api/students/**","/api/teachers").authenticated()
-                                .requestMatchers("/api/auth/me", "/api/auth/logout", "/api/modules/**").authenticated()
-//                        .requestMatchers("/api/packets/**").permitAll()
+                                .requestMatchers("/api/auth/logout", "/api/modules/**","/api/classes/**","/api/auth/me","/api/dashboard/**","/api/students/**","/api/teachers/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)

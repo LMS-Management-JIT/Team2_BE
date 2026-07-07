@@ -86,31 +86,23 @@ public class AuthServiceImpl implements IAuthService {
     @SneakyThrows
     @Override
     public UserResponse getCurrentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new IllegalStateException("Authentication required");
-        }
-
-        Object principal = authentication.getPrincipal();
-        String email;
-        if (principal instanceof UserDetails userDetails) {
-            email = userDetails.getUsername();
-        } else if (principal instanceof String principalName && !"anonymousUser".equals(principalName)) {
-            email = principalName;
-        } else {
-            throw new IllegalStateException("Authentication required");
-        }
+        String email = SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getName();
 
         AccountEntity account = accountRepository.findByUsername(email)
                 .orElseThrow(() -> new IllegalStateException("Account not found"));
 
-        UserResponse response = new UserResponse();
-        response.setId(account.getId());
-        response.setUsername(account.getEmail());
-        response.setEmail(account.getEmail());
-        response.setRole(String.valueOf(roleRepository.findById(account.getRoleId())));
-        response.setCreatedAt(account.getCreateDate());
-        return response;
+        String role = roleRepository.findById(account.getRoleId())
+                .orElseThrow(() -> new IllegalStateException("Role not found"))
+                .getName();
+
+        return UserResponse.builder()
+                .id(account.getId())
+                .username(account.getEmail())
+                .email(account.getEmail())
+                .role(role)
+                .createdAt(account.getCreateDate())
+                .build();
     }
 }
