@@ -6,17 +6,17 @@ import com.lms.backend.dto.LoginResult;
 import com.lms.backend.dto.response.UserResponse;
 import com.lms.backend.entity.AccountEntity;
 import com.lms.backend.entity.RefreshTokenEntity;
-import com.lms.backend.entity.RoleEntity;
 import com.lms.backend.repository.AccountRepository;
 import com.lms.backend.repository.RoleRepository;
 import com.lms.backend.security.JwtUtil;
 import com.lms.backend.service.IAuthService;
 import com.lms.backend.service.IRefreshTokenService;
-import java.time.LocalDateTime;
+
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -30,7 +30,8 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class AuthServiceImpl implements IAuthService {
     private static final Logger log = Logger.getLogger(AuthServiceImpl.class.getName());
-    private static final long ACCESS_TOKEN_TTL_SECONDS = 900;
+    @Value("${jwt.expiration}")
+    private long accessTokenTtlSeconds;
     private final RoleRepository roleRepository;
     private final AccountRepository accountRepository;
     private final PasswordEncoder passwordEncoder;
@@ -54,7 +55,7 @@ public class AuthServiceImpl implements IAuthService {
         log.info("User " + account.getEmail() + " logged in");
 
         return new LoginResult(
-                new AccessTokenResponse(accessToken, ACCESS_TOKEN_TTL_SECONDS),
+                new AccessTokenResponse(accessToken, accessTokenTtlSeconds),
                 refreshTokenEntity.getToken()
         );
     }
@@ -68,7 +69,7 @@ public class AuthServiceImpl implements IAuthService {
 
         log.info("Token refreshed for: " + account.getEmail());
         return new LoginResult(
-                new AccessTokenResponse(accessToken, ACCESS_TOKEN_TTL_SECONDS, account.getEmail(), account.getRoleId()),
+                new AccessTokenResponse(accessToken, accessTokenTtlSeconds, account.getEmail(), account.getRoleId()),
                 refreshTokenEntity.getToken()
         );
     }

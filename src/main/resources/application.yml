@@ -3,7 +3,7 @@ firebase:
 
 jwt:
   secret: ${JWT_SECRET:VGhpcyBpcyBhIHZlcnkgc2VjdXJlIHNlY3JldCBrZXkgZm9yIEpXVA}
-  expiration: ${JWT_EXPIRATION:3600000}
+  expiration: ${JWT_EXPIRATION:36000000}
 server:
   port : ${PORT:1010}
 
