@@ -3,6 +3,7 @@ package com.lms.backend.service.impl;
 import com.google.cloud.firestore.DocumentReference;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.SetOptions;
+import com.lms.backend.dto.request.StudentClassRequest;
 import com.lms.backend.dto.request.StudentRequest;
 import com.lms.backend.dto.response.ClassResponse;
 import com.lms.backend.dto.response.StudentResponse;
@@ -150,6 +151,8 @@ public class StudentServiceImpl implements IStudentService {
             StudentEntity student =
                     studentMapper.toStudentEntity(request);
 
+            student.setStatus(request.getStatus());
+
             account.setPassword(passwordEncoder.encode("123456"));
 
             account.setCreatedBy(email);
@@ -207,16 +210,16 @@ public class StudentServiceImpl implements IStudentService {
                 // ==========================
                 // Student Class (THÊM MỚI)
                 // ==========================
-                if (request.getClassIds() != null) {
+                if (request.getClasses() != null) {
 
-                    for (String classId : request.getClassIds()) {
+                    for (StudentClassRequest item : request.getClasses()) {
 
                         StudentClassEntity studentClass =
-                                studentClassMapper.toEntity(classId);
+                                studentClassMapper.toEntity(item.getClassId());
 
                         studentClass.setStudentId(student.getId());
 
-                        studentClass.setStatus("ACTIVE");
+                        studentClass.setStatus(item.getStatus());
                         studentClass.setDeleted(false);
 
                         studentClass.setCreatedBy(email);
@@ -270,8 +273,8 @@ public class StudentServiceImpl implements IStudentService {
                                         student
                                 );
 
-                        response.setClasses(
-                                studentClassRepository.findClassesByStudentId(
+                        response.setClassNames(
+                                studentClassRepository.findClassNamesByStudentId(
                                         student.getId()
                                 )
                         );

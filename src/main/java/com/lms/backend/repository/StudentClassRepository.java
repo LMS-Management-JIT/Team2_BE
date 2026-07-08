@@ -111,11 +111,11 @@ public class StudentClassRepository {
         }
     }
 
-    public List<ClassResponse> findClassesByStudentId(String studentId) {
+    public List<String> findClassNamesByStudentId(String studentId) {
 
         try {
 
-            List<ClassResponse> result = new ArrayList<>();
+            List<String> result = new ArrayList<>();
 
             List<QueryDocumentSnapshot> relations =
                     getStudentClassCollection()
@@ -133,16 +133,14 @@ public class StudentClassRepository {
                     continue;
                 }
 
-                ClassEntity classEntity =
-                        classRepository.findById(classId);
-//                System.out.println("==========");
-//                System.out.println("ClassId: " + classId);
-//                System.out.println("Entity: " + classEntity);
-//                System.out.println("ClassName: " + (classEntity == null ? null : classEntity.getClassName()));
-//                System.out.println("CourseId: " + (classEntity == null ? null : classEntity.getCourseId()));
+                DocumentSnapshot classDoc =
+                        firestore.collection("classes")
+                                .document(classId)
+                                .get()
+                                .get();
 
-                if (classEntity != null) {
-                    result.add(classMapper.toResponse(classEntity));
+                if (classDoc.exists()) {
+                    result.add(classDoc.getString("class_name"));
                 }
             }
 

@@ -38,5 +38,5 @@ public class StudentResponse {
 
     private String status;
 
-    private List<ClassResponse> classes;
+    private List<String> classNames;
 }

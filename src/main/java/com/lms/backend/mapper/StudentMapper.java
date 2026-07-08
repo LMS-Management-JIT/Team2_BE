@@ -65,7 +65,7 @@ public class StudentMapper {
                 .interviewContent(request.getInterviewContent())
                 .admissionResult(request.getAdmissionResult())
                 .description(request.getDescription())
-                .status("ACTIVE")
+                .status(request.getStatus())
                 .deleted(false)
                 .createdBy(request.getRequestedBy())
                 .updatedBy(request.getRequestedBy())

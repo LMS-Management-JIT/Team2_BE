@@ -3,7 +3,6 @@ package com.lms.backend.dto.request;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -54,4 +53,8 @@ public class StudentRequest {
     private String requestedBy;
 
     private List<String> classIds;
+
+    private String status;              // Trạng thái của Student
+
+    private List<StudentClassRequest> classes;
 }
