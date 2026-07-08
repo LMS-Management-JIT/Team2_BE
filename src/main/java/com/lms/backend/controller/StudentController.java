@@ -11,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/students")
@@ -35,10 +36,17 @@ public class StudentController {
     // READ ALL
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public ResponseEntity<List<StudentResponse>> getAllStudents()
-            throws Exception {
+    public ResponseEntity<Map<String, Object>> getAllStudents(
 
-        return ResponseEntity.ok(studentService.getAllStudents());
+            @RequestParam(defaultValue = "1") int page,
+
+            @RequestParam(defaultValue = "7") int size
+
+    ) {
+
+        return ResponseEntity.ok(
+                studentService.getAllStudents(page, size)
+        );
     }
 
     // DETAIL

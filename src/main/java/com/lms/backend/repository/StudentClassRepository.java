@@ -3,6 +3,7 @@ package com.lms.backend.repository;
 import com.google.api.core.ApiFuture;
 import com.google.cloud.firestore.*;
 import com.lms.backend.dto.response.ClassResponse;
+import com.lms.backend.dto.response.StudentClassResponse;
 import com.lms.backend.entity.ClassEntity;
 import com.lms.backend.entity.StudentClassEntity;
 import com.lms.backend.mapper.ClassMapper;
@@ -111,11 +112,11 @@ public class StudentClassRepository {
         }
     }
 
-    public List<String> findClassNamesByStudentId(String studentId) {
+    public List<StudentClassResponse> findClassesByStudentId(String studentId) {
 
         try {
 
-            List<String> result = new ArrayList<>();
+            List<StudentClassResponse> result = new ArrayList<>();
 
             List<QueryDocumentSnapshot> relations =
                     getStudentClassCollection()
@@ -133,15 +134,21 @@ public class StudentClassRepository {
                     continue;
                 }
 
-                DocumentSnapshot classDoc =
-                        firestore.collection("classes")
-                                .document(classId)
-                                .get()
-                                .get();
+                ClassEntity classEntity =
+                        classRepository.findById(classId);
 
-                if (classDoc.exists()) {
-                    result.add(classDoc.getString("class_name"));
+                if (classEntity == null) {
+                    continue;
                 }
+
+                StudentClassResponse item =
+                        StudentClassResponse.builder()
+                                .classId(classId)
+                                .className(classEntity.getClassName())
+                                .status(relation.getString("status"))
+                                .build();
+
+                result.add(item);
             }
 
             return result;
@@ -174,11 +181,16 @@ public class StudentClassRepository {
     }
 
     // DELETE
-    public String softDelete(StudentClassEntity entity)
+    public void softDeleteByStudentId(String studentId)
             throws ExecutionException, InterruptedException {
 
-        entity.setDeleted(true);
+        List<StudentClassEntity> list = findByStudentId(studentId);
 
-        return update(entity);
+        for (StudentClassEntity entity : list) {
+
+            entity.setDeleted(true);
+
+            update(entity);
+        }
     }
 }
