@@ -1,6 +1,8 @@
 package com.lms.backend.service.impl;
 
+import com.google.cloud.firestore.CollectionReference;
 import com.google.cloud.firestore.DocumentSnapshot;
+import com.google.cloud.firestore.Query;
 import com.google.cloud.firestore.QueryDocumentSnapshot;
 import com.lms.backend.dto.request.ClassRequest;
 import com.lms.backend.dto.response.ClassDetailResponse;
@@ -20,6 +22,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -125,13 +128,90 @@ public class ClassServiceImpl implements IClassService {
     }
 
     @Override
-    public List<ClassResponse> getAllClasses() {
+    public Map<String, Object> getAllClasses(int page, int size, String name, String program, String status, String startDate, String endDate) {
         return executeWithCatch(() -> {
-            List<ClassEntity> entities = classRepository.findAllActive();
-            return entities.stream().map(classMapper::toResponse).collect(Collectors.toList());
+            // 1. Khởi tạo Query gốc trên Firestore (CHỈ LỌC CÁC ĐIỀU KIỆN BẰNG NHAU)
+            CollectionReference classesRef = classRepository.getClassCollection();
+            Query query = classesRef.whereEqualTo("deleted", false);
+
+            if (status != null && !status.isEmpty()) {
+                query = query.whereEqualTo("status", status);
+            }
+            if (program != null && !program.isEmpty()) {
+                query = query.whereEqualTo("programe", program);
+            }
+
+            // 2. Lấy toàn bộ dữ liệu thỏa mãn điều kiện 'bằng' về Java
+            List<QueryDocumentSnapshot> documents = query.get().get().getDocuments();
+
+            // Map sang Entity
+            List<ClassEntity> allEntities = documents.stream()
+                    .map(classMapper::fromDocument)
+                    .filter(java.util.Objects::nonNull)
+                    .collect(Collectors.toList());
+
+            // 3. Xử lý Date formatter (FE đang gửi lên định dạng yyyy-MM-dd)
+            java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+            LocalDateTime startFilter = (startDate != null && !startDate.isEmpty())
+                    ? java.time.LocalDate.parse(startDate, formatter).atStartOfDay()
+                    : null;
+
+            LocalDateTime endFilter = (endDate != null && !endDate.isEmpty())
+                    ? java.time.LocalDate.parse(endDate, formatter).atTime(23, 59, 59)
+                    : null;
+
+            // 4. Lọc Tên và Ngày tháng bằng Java Stream
+            List<ClassEntity> filteredList = allEntities.stream()
+                    .filter(c -> {
+                        // Lọc Tên (Chứa từ khóa, không phân biệt hoa thường)
+                        if (name != null && !name.isEmpty()) {
+                            if (c.getClassName() == null || !c.getClassName().toLowerCase().contains(name.toLowerCase())) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    })
+                    .filter(c -> {
+                        // Lọc Ngày bắt đầu (Lớp học phải bắt đầu SAU hoặc BẰNG ngày filter)
+                        if (startFilter != null && c.getStartDateClass() != null) {
+                            if (c.getStartDateClass().isBefore(startFilter)) return false;
+                        }
+                        return true;
+                    })
+                    .filter(c -> {
+                        // Lọc Ngày kết thúc (Lớp học phải kết thúc TRƯỚC hoặc BẰNG ngày filter)
+                        if (endFilter != null && c.getEndDateClass() != null) {
+                            if (c.getEndDateClass().isAfter(endFilter)) return false;
+                        }
+                        return true;
+                    })
+                    // Thêm sắp xếp nếu muốn (VD: mới nhất lên đầu)
+                    .sorted((c1, c2) -> c2.getCreateDate().compareTo(c1.getCreateDate()))
+                    .collect(Collectors.toList());
+
+            // 5. Phân trang thủ công trên list đã lọc
+            int totalElements = filteredList.size();
+            int totalPages = (int) Math.ceil((double) totalElements / size);
+
+            int fromIndex = (page - 1) * size;
+            int toIndex = Math.min(fromIndex + size, totalElements);
+
+            List<ClassResponse> items = new ArrayList<>();
+            if (fromIndex < totalElements) {
+                items = filteredList.subList(fromIndex, toIndex).stream()
+                        .map(classMapper::toResponse)
+                        .collect(Collectors.toList());
+            }
+
+            // 6. Đóng gói kết quả
+            Map<String, Object> response = new HashMap<>();
+            response.put("items", items);
+            response.put("totalPages", totalPages > 0 ? totalPages : 1);
+
+            return response;
         }, "Lỗi hệ thống khi lấy danh sách lớp học");
     }
-
     @Override
     public ClassDetailResponse getClassDetail(String classId) {
         ClassEntity classEntity = checkClassExists(classId);
