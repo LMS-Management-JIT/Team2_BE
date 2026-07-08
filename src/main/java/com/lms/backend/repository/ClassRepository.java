@@ -24,7 +24,7 @@ public class ClassRepository {
     @Autowired
     private ClassMapper classMapper;
 
-    private CollectionReference getClassCollection() {
+    public CollectionReference getClassCollection() {
         return firestore.collection("classes");
     }
 
