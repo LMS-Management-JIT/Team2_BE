@@ -22,6 +22,7 @@ public class ClassEntity {
     @PropertyName("class_name")
     private String className;
 
+    private String note;
     private String description;
     private String programe;
     private String status;

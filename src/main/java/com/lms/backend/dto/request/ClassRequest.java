@@ -13,6 +13,8 @@ public class ClassRequest {
 
     private String description;
 
+    private String note;
+
     @NotBlank(message = "Chương trình học không được để trống")
     private String programe;
 

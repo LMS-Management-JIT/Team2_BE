@@ -20,4 +20,5 @@ public class ClassResponse {
 
     private boolean deleted;
     private String courseId;
+    private String note;
 }

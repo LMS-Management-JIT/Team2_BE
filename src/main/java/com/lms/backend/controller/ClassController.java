@@ -41,10 +41,10 @@ public class ClassController {
         return ResponseEntity.ok(classService.getClassDetail(id));
     }
 
-    @GetMapping("/{id}/course")
+    @GetMapping("/all-courses")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER', 'STUDENT')")
-    public ResponseEntity<Map<String, Object>> getCourseOfClass(@PathVariable String id) {
-        return ResponseEntity.ok(classService.getCourseOfClass(id));
+    public ResponseEntity<List<Map<String, Object>>> findAllCourses() {
+        return ResponseEntity.ok(classService.findAllCourses());
     }
 
     @GetMapping("/{id}/students")
@@ -67,7 +67,7 @@ public class ClassController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<String> deleteClass(@PathVariable String id, @RequestParam String deletedBy) {
-        return ResponseEntity.ok(classService.deleteClass(id, deletedBy));
+    public ResponseEntity<String> deleteClass(@PathVariable String id) {
+        return ResponseEntity.ok(classService.deleteClass(id));
     }
 }
