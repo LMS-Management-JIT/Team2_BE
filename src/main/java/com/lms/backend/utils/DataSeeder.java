@@ -98,7 +98,7 @@ public class DataSeeder {
 
         AccountEntity admin = AccountEntity.builder()
                 .email(adminEmail)
-                .password(passwordEncoder.encode("admin"))
+                .password(passwordEncoder.encode("admin123"))
                 .roleId(adminRoleId)
                 .status("ACTIVE")
                 .deleted(false)

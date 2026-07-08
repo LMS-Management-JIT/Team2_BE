@@ -21,6 +21,7 @@ public class ClassMapper {
         return ClassEntity.builder()
                 .className(request.getClassName())
                 .description(request.getDescription())
+                .note(request.getNote())
                 .programe(request.getPrograme())
                 .status(request.getStatus())
                 .courseId(request.getCourseId())
@@ -36,6 +37,7 @@ public class ClassMapper {
         response.setId(entity.getId());
         response.setClassName(entity.getClassName());
         response.setDescription(entity.getDescription());
+        response.setNote(entity.getNote());
         response.setPrograme(entity.getPrograme());
         response.setStatus(entity.getStatus());
         response.setCreatedBy(entity.getCreatedBy());
@@ -55,6 +57,7 @@ public class ClassMapper {
 
         existingEntity.setClassName(request.getClassName());
         existingEntity.setDescription(request.getDescription());
+        existingEntity.setNote(request.getNote());
         existingEntity.setPrograme(request.getPrograme());
         existingEntity.setStatus(request.getStatus());
         existingEntity.setCourseId(request.getCourseId());
@@ -68,6 +71,7 @@ public class ClassMapper {
         Map<String, Object> map = new HashMap<>();
         map.put("class_name", entity.getClassName());
         map.put("description", entity.getDescription());
+        map.put("note", entity.getNote());
         map.put("programe", entity.getPrograme());
         map.put("status", entity.getStatus());
         map.put("deleted", entity.isDeleted());
@@ -91,6 +95,21 @@ public class ClassMapper {
 
         if (entity != null) {
             entity.setId(doc.getId());
+            if (doc.contains("class_name")) {
+                entity.setClassName(doc.getString("class_name"));
+            }
+            if (doc.contains("course_id")) {
+                entity.setCourseId(doc.getString("course_id"));
+            }
+            if (doc.contains("created_by")) {
+                entity.setCreatedBy(doc.getString("created_by"));
+            }
+            if (doc.contains("update_by")) {
+                entity.setUpdateBy(doc.getString("update_by"));
+            }
+            if (doc.contains("note")) {
+                entity.setNote(doc.getString("note"));
+            }
             entity.setStartDateClass(toLocalDateTime(doc.getDate("start_date_class")));
             entity.setEndDateClass(toLocalDateTime(doc.getDate("end_date_class")));
             entity.setCreateDate(toLocalDateTime(doc.getDate("create_date")));

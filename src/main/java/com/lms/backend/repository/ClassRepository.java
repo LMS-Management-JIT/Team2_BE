@@ -74,47 +74,44 @@ public class ClassRepository {
         }
         return null;
     }
+    public List<Map<String, Object>> findAllCourses() throws ExecutionException, InterruptedException {
+        List<Map<String, Object>> courses = new ArrayList<>();
+        QuerySnapshot snapshot = firestore.collection("courses").whereEqualTo("deleted", false).get().get();
 
-    // LẤY DANH SÁCH SINH VIÊN (Từ bảng trung gian student_class)
-    public List<Map<String, Object>> getStudentsByClassId(String classId) throws ExecutionException, InterruptedException {
-        List<Map<String, Object>> students = new ArrayList<>();
-        List<QueryDocumentSnapshot> relations = firestore.collection("student_class")
-                .whereEqualTo("class_id", classId)
-                .whereEqualTo("deleted", false).get().get().getDocuments();
-
-        for (QueryDocumentSnapshot rel : relations) {
-            String studentId = rel.getString("student_id");
-            if (studentId != null) {
-                DocumentSnapshot studentDoc = firestore.collection("students").document(studentId).get().get();
-                if (studentDoc.exists()) {
-                    Map<String, Object> data = studentDoc.getData();
-                    data.put("id", studentDoc.getId());
-                    students.add(data);
-                }
-            }
+        for (QueryDocumentSnapshot doc : snapshot.getDocuments()) {
+            Map<String, Object> data = doc.getData();
+            data.put("id", doc.getId()); // Gán ID tài liệu vào map
+            courses.add(data);
         }
-        return students;
+        return courses;
+    }
+    // LẤY DANH SÁCH SINH VIÊN
+    public List<QueryDocumentSnapshot> findStudentsRelationByClassId(String classId) throws Exception {
+        return firestore.collection("student_class")
+                .whereEqualTo("class_id", classId)
+                .whereEqualTo("deleted", false)
+                .get().get().getDocuments();
     }
 
-    // LẤY DANH SÁCH GIẢNG VIÊN (Từ bảng trung gian teacher_class)
-    public List<Map<String, Object>> getTeachersByClassId(String classId) throws ExecutionException, InterruptedException {
-        List<Map<String, Object>> teachers = new ArrayList<>();
-        List<QueryDocumentSnapshot> relations = firestore.collection("teacher_class")
+    public DocumentSnapshot getStudentDoc(String studentId) throws Exception {
+        return firestore.collection("students").document(studentId.trim()).get().get();
+    }
+    // Lấy quan hệ từ bảng trung gian
+    public List<QueryDocumentSnapshot> findTeachersRelationByClassId(String classId) throws Exception {
+        return firestore.collection("teacher_class")
                 .whereEqualTo("class_id", classId)
-                .whereEqualTo("deleted", false).get().get().getDocuments();
+                .whereEqualTo("deleted", false)
+                .get().get().getDocuments();
+    }
 
-        for (QueryDocumentSnapshot rel : relations) {
-            String teacherId = rel.getString("teacher_id");
-            if (teacherId != null) {
-                DocumentSnapshot teacherDoc = firestore.collection("teachers").document(teacherId).get().get();
-                if (teacherDoc.exists()) {
-                    Map<String, Object> data = teacherDoc.getData();
-                    data.put("id", teacherDoc.getId());
-                    teachers.add(data);
-                }
-            }
-        }
-        return teachers;
+    // Lấy thông tin giảng viên
+    public DocumentSnapshot getTeacherDoc(String teacherId) throws Exception {
+        return firestore.collection("teachers").document(teacherId.trim()).get().get();
+    }
+
+    // Lấy thông tin profile
+    public DocumentSnapshot getProfileDoc(String profileId) throws Exception {
+        return firestore.collection("profiles").document(profileId).get().get();
     }
 
     // UPDATE

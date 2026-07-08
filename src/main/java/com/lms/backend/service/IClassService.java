@@ -14,7 +14,7 @@ public interface IClassService {
 
     ClassDetailResponse getClassDetail(String classId);
 
-    Map<String, Object> getCourseOfClass(String classId);
+    List<Map<String, Object>> findAllCourses();
 
     List<Map<String, Object>> getStudentsOfClass(String classId);
 
@@ -22,7 +22,7 @@ public interface IClassService {
 
     String updateClass(String classId, ClassRequest request);
 
-    String deleteClass(String classId, String deletedBy);
+    String deleteClass(String classId);
 
     long countClasses();
 }
