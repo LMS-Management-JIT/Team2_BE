@@ -1,5 +1,7 @@
 package com.lms.backend.service.impl;
 
+import com.google.cloud.firestore.DocumentSnapshot;
+import com.google.cloud.firestore.QueryDocumentSnapshot;
 import com.lms.backend.dto.request.ClassRequest;
 import com.lms.backend.dto.response.ClassDetailResponse;
 import com.lms.backend.dto.response.ClassResponse;
@@ -17,6 +19,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -139,31 +142,101 @@ public class ClassServiceImpl implements IClassService {
 
         return executeWithCatch(() -> {
             detailResponse.setCourse(classRepository.getCourseById(classEntity.getCourseId()));
-            detailResponse.setStudents(classRepository.getStudentsByClassId(classId));
-            detailResponse.setTeachers(classRepository.getTeachersByClassId(classId));
+            detailResponse.setStudents(this.getStudentsOfClass(classId));
+            detailResponse.setTeachers(this.getTeachersOfClass(classId));
             return detailResponse;
         }, "Lỗi hệ thống khi lấy chi tiết liên kết của lớp học");
     }
 
     @Override
-    public Map<String, Object> getCourseOfClass(String classId) {
-        ClassEntity classEntity = checkClassExists(classId);
-        return executeWithCatch(() -> classRepository.getCourseById(classEntity.getCourseId()),
-                "Lỗi hệ thống khi lấy thông tin khóa học");
+    public List<Map<String, Object>> findAllCourses() {
+        return executeWithCatch(() -> classRepository.findAllCourses(),
+                "Lỗi hệ thống khi lấy danh sách khóa học");
     }
 
     @Override
     public List<Map<String, Object>> getStudentsOfClass(String classId) {
-        checkClassExists(classId);
-        return executeWithCatch(() -> classRepository.getStudentsByClassId(classId),
-                "Lỗi hệ thống khi lấy danh sách sinh viên");
+        try {
+            List<Map<String, Object>> students = new ArrayList<>();
+
+            // 1. Lấy quan hệ từ Repository
+            List<QueryDocumentSnapshot> relations = classRepository.findStudentsRelationByClassId(classId);
+
+            for (QueryDocumentSnapshot rel : relations) {
+                String studentId = rel.getString("student_id");
+                if (studentId != null) {
+                    // 2. Gọi Repo lấy thông tin Student (để có profile_id)
+                    DocumentSnapshot studentDoc = classRepository.getStudentDoc(studentId);
+
+                    if (studentDoc.exists()) {
+                        String profileId = studentDoc.getString("profile_id");
+
+                        Map<String, Object> studentInfo = new java.util.HashMap<>();
+                        studentInfo.put("id", studentId);
+                        studentInfo.put("avatarUrl", "https://via.placeholder.com/100");
+                        studentInfo.put("name", "Sinh viên chưa cập nhật");
+
+                        // 3. Gọi Repo lấy Profile nếu có profileId
+                        if (profileId != null) {
+                            DocumentSnapshot profileDoc = classRepository.getProfileDoc(profileId);
+                            if (profileDoc.exists()) {
+                                String fullName = profileDoc.getString("full_name");
+                                if (fullName != null) {
+                                    studentInfo.put("name", fullName);
+                                }
+                            }
+                        }
+                        students.add(studentInfo);
+                    }
+                }
+            }
+            return students;
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi khi lấy danh sách sinh viên: " + e.getMessage());
+        }
     }
 
     @Override
     public List<Map<String, Object>> getTeachersOfClass(String classId) {
-        checkClassExists(classId);
-        return executeWithCatch(() -> classRepository.getTeachersByClassId(classId),
-                "Lỗi hệ thống khi lấy danh sách giảng viên");
+        try {
+            List<Map<String, Object>> teachers = new ArrayList<>();
+
+            // 1. Lấy quan hệ từ Repository
+            List<QueryDocumentSnapshot> relations = classRepository.findTeachersRelationByClassId(classId);
+
+            for (QueryDocumentSnapshot rel : relations) {
+                String teacherId = rel.getString("teacher_id");
+                if (teacherId != null) {
+
+                    // 2. Gọi Repo lấy thông tin Teacher
+                    DocumentSnapshot teacherDoc = classRepository.getTeacherDoc(teacherId);
+
+                    if (teacherDoc.exists()) {
+                        String profileId = teacherDoc.getString("profile_id");
+
+                        Map<String, Object> teacherInfo = new java.util.HashMap<>();
+                        teacherInfo.put("id", teacherId);
+                        teacherInfo.put("avatarUrl", "https://via.placeholder.com/100");
+                        teacherInfo.put("name", "Giảng viên chưa cập nhật");
+
+                        // 3. Gọi Repo lấy Profile nếu có profileId
+                        if (profileId != null) {
+                            DocumentSnapshot profileDoc = classRepository.getProfileDoc(profileId);
+                            if (profileDoc.exists()) {
+                                String fullName = profileDoc.getString("full_name");
+                                if (fullName != null) {
+                                    teacherInfo.put("name", fullName);
+                                }
+                            }
+                        }
+                        teachers.add(teacherInfo);
+                    }
+                }
+            }
+            return teachers;
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi khi lấy danh sách giảng viên: " + e.getMessage());
+        }
     }
 
     @Override
@@ -180,9 +253,10 @@ public class ClassServiceImpl implements IClassService {
     }
 
     @Override
-    public String deleteClass(String classId, String deletedBy) {
+    public String deleteClass(String classId) { // Bỏ deletedBy ở tham số nếu lấy từ Token
+        String email = getCurrentUserEmail(); // Lấy từ SecurityContext
         checkClassExists(classId);
-        return executeWithCatch(() -> classRepository.softDeleteWithCascade(classId, deletedBy),
+        return executeWithCatch(() -> classRepository.softDeleteWithCascade(classId, email),
                 "Lỗi hệ thống khi xóa lớp học");
     }
 
