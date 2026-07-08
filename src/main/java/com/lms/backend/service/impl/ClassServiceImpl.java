@@ -267,10 +267,14 @@ public class ClassServiceImpl implements IClassService {
         validateClassLogic(request, true);
 
         Map<String, HistoryEntity.ChangeDetail> changes = new HashMap<>();
-        changes.put("className", changed(existingClass.getClassName(), request.getClassName()));
+        changes.put("class_name", changed(existingClass.getClassName(), request.getClassName()));
         changes.put("status", changed(existingClass.getStatus(), request.getStatus()));
-        changes.put("startDateClass", changed(existingClass.getStartDateClass(), request.getStartDateClass()));
-        changes.put("endDateClass", changed(existingClass.getEndDateClass(), request.getEndDateClass()));
+        changes.put("start_date_class", changed(existingClass.getStartDateClass(), request.getStartDateClass()));
+        changes.put("end_date_class", changed(existingClass.getEndDateClass(), request.getEndDateClass()));
+        changes.put("description", changed(existingClass.getDescription(), request.getDescription()));
+        changes.put("note", changed(existingClass.getNote(), request.getNote()));
+        changes.put("programe", changed(existingClass.getPrograme(), request.getPrograme()));
+        changes.put("course_id", changed(existingClass.getCourseId(), request.getCourseId()));
 
         String result = executeWithCatch(() -> {
             classMapper.updateEntityFromRequest(request, existingClass);
