@@ -1,16 +1,23 @@
 package com.lms.backend.service.impl;
 
+import com.google.cloud.firestore.CollectionReference;
 import com.google.cloud.firestore.DocumentSnapshot;
+import com.google.cloud.firestore.Query;
 import com.google.cloud.firestore.QueryDocumentSnapshot;
 import com.lms.backend.dto.request.ClassRequest;
+import com.lms.backend.dto.request.HistoryRequest;
 import com.lms.backend.dto.response.ClassDetailResponse;
 import com.lms.backend.dto.response.ClassResponse;
+import com.lms.backend.entity.ActionType;
 import com.lms.backend.entity.ClassEntity;
+import com.lms.backend.entity.EntityType;
+import com.lms.backend.entity.HistoryEntity;
 import com.lms.backend.exception.BadRequestException;
 import com.lms.backend.exception.ResourceNotFoundException;
 import com.lms.backend.mapper.ClassMapper;
 import com.lms.backend.repository.ClassRepository;
 import com.lms.backend.service.IClassService;
+import com.lms.backend.service.IHistoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.security.core.Authentication;
@@ -20,10 +27,13 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
+
+import static com.lms.backend.utils.HistoryChangeUtils.changed;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +41,7 @@ public class ClassServiceImpl implements IClassService {
 
     private final ClassRepository classRepository;
     private final ClassMapper classMapper;
+    private final IHistoryService historyService;
 
     private <T> T executeWithCatch(Callable<T> task, String errorMessage) {
         try {
@@ -114,7 +125,7 @@ public class ClassServiceImpl implements IClassService {
     public String createClass(ClassRequest request) {
         String email = getCurrentUserEmail();
         validateClassLogic(request, false);
-        return executeWithCatch(() -> {
+        String newId = executeWithCatch(() -> {
             ClassEntity entity = classMapper.toEntity(request);
             entity.setStartDateClass(request.getStartDateClass());
             entity.setCreateDate(LocalDateTime.now());
@@ -122,16 +133,105 @@ public class ClassServiceImpl implements IClassService {
             entity.setDeleted(false);
             return classRepository.save(entity);
         }, "Lỗi hệ thống khi tạo lớp học");
+
+        historyService.record(HistoryRequest.builder()
+                .action(ActionType.ADD)
+                .actorId(email)
+                .actorName(email)
+                .entityType(EntityType.CLASS.name())
+                .entityId(newId)
+                .entityName(request.getClassName())
+                .changes(Map.of())
+                .build());
+
+        return newId;
     }
 
     @Override
-    public List<ClassResponse> getAllClasses() {
+    public Map<String, Object> getAllClasses(int page, int size, String name, String program, String status, String startDate, String endDate) {
         return executeWithCatch(() -> {
-            List<ClassEntity> entities = classRepository.findAllActive();
-            return entities.stream().map(classMapper::toResponse).collect(Collectors.toList());
+            // 1. Khởi tạo Query gốc trên Firestore (CHỈ LỌC CÁC ĐIỀU KIỆN BẰNG NHAU)
+            CollectionReference classesRef = classRepository.getClassCollection();
+            Query query = classesRef.whereEqualTo("deleted", false);
+
+            if (status != null && !status.isEmpty()) {
+                query = query.whereEqualTo("status", status);
+            }
+            if (program != null && !program.isEmpty()) {
+                query = query.whereEqualTo("programe", program);
+            }
+
+            // 2. Lấy toàn bộ dữ liệu thỏa mãn điều kiện 'bằng' về Java
+            List<QueryDocumentSnapshot> documents = query.get().get().getDocuments();
+
+            // Map sang Entity
+            List<ClassEntity> allEntities = documents.stream()
+                    .map(classMapper::fromDocument)
+                    .filter(java.util.Objects::nonNull)
+                    .collect(Collectors.toList());
+
+            // 3. Xử lý Date formatter (FE đang gửi lên định dạng yyyy-MM-dd)
+            java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+            LocalDateTime startFilter = (startDate != null && !startDate.isEmpty())
+                    ? java.time.LocalDate.parse(startDate, formatter).atStartOfDay()
+                    : null;
+
+            LocalDateTime endFilter = (endDate != null && !endDate.isEmpty())
+                    ? java.time.LocalDate.parse(endDate, formatter).atTime(23, 59, 59)
+                    : null;
+
+            // 4. Lọc Tên và Ngày tháng bằng Java Stream
+            List<ClassEntity> filteredList = allEntities.stream()
+                    .filter(c -> {
+                        // Lọc Tên (Chứa từ khóa, không phân biệt hoa thường)
+                        if (name != null && !name.isEmpty()) {
+                            if (c.getClassName() == null || !c.getClassName().toLowerCase().contains(name.toLowerCase())) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    })
+                    .filter(c -> {
+                        // Lọc Ngày bắt đầu (Lớp học phải bắt đầu SAU hoặc BẰNG ngày filter)
+                        if (startFilter != null && c.getStartDateClass() != null) {
+                            if (c.getStartDateClass().isBefore(startFilter)) return false;
+                        }
+                        return true;
+                    })
+                    .filter(c -> {
+                        // Lọc Ngày kết thúc (Lớp học phải kết thúc TRƯỚC hoặc BẰNG ngày filter)
+                        if (endFilter != null && c.getEndDateClass() != null) {
+                            if (c.getEndDateClass().isAfter(endFilter)) return false;
+                        }
+                        return true;
+                    })
+                    // Thêm sắp xếp nếu muốn (VD: mới nhất lên đầu)
+                    .sorted((c1, c2) -> c2.getCreateDate().compareTo(c1.getCreateDate()))
+                    .collect(Collectors.toList());
+
+            // 5. Phân trang thủ công trên list đã lọc
+            int totalElements = filteredList.size();
+            int totalPages = (int) Math.ceil((double) totalElements / size);
+
+            int fromIndex = (page - 1) * size;
+            int toIndex = Math.min(fromIndex + size, totalElements);
+
+            List<ClassResponse> items = new ArrayList<>();
+            if (fromIndex < totalElements) {
+                items = filteredList.subList(fromIndex, toIndex).stream()
+                        .map(classMapper::toResponse)
+                        .collect(Collectors.toList());
+            }
+
+            // 6. Đóng gói kết quả
+            Map<String, Object> response = new HashMap<>();
+            response.put("items", items);
+            response.put("totalPages", totalPages > 0 ? totalPages : 1);
+
+            return response;
         }, "Lỗi hệ thống khi lấy danh sách lớp học");
     }
-
     @Override
     public ClassDetailResponse getClassDetail(String classId) {
         ClassEntity classEntity = checkClassExists(classId);
@@ -244,20 +344,55 @@ public class ClassServiceImpl implements IClassService {
         String email = getCurrentUserEmail();
         ClassEntity existingClass = checkClassExists(classId);
         validateClassLogic(request, true);
-        return executeWithCatch(() -> {
+
+        Map<String, HistoryEntity.ChangeDetail> changes = new HashMap<>();
+        changes.put("class_name", changed(existingClass.getClassName(), request.getClassName()));
+        changes.put("status", changed(existingClass.getStatus(), request.getStatus()));
+        changes.put("start_date_class", changed(existingClass.getStartDateClass(), request.getStartDateClass()));
+        changes.put("end_date_class", changed(existingClass.getEndDateClass(), request.getEndDateClass()));
+        changes.put("description", changed(existingClass.getDescription(), request.getDescription()));
+        changes.put("note", changed(existingClass.getNote(), request.getNote()));
+        changes.put("programe", changed(existingClass.getPrograme(), request.getPrograme()));
+        changes.put("course_id", changed(existingClass.getCourseId(), request.getCourseId()));
+
+        String result = executeWithCatch(() -> {
             classMapper.updateEntityFromRequest(request, existingClass);
             existingClass.setUpdateDate(LocalDateTime.now());
             existingClass.setUpdateBy(email);
             return classRepository.update(classId, existingClass);
         }, "Lỗi hệ thống khi cập nhật lớp học");
+
+        historyService.record(HistoryRequest.builder()
+                .action(ActionType.UPDATE)
+                .actorId(email)
+                .actorName(email)
+                .entityType(EntityType.CLASS.name())
+                .entityId(classId)
+                .entityName(existingClass.getClassName())
+                .changes(changes)
+                .build());
+
+        return result;
     }
 
     @Override
     public String deleteClass(String classId) { // Bỏ deletedBy ở tham số nếu lấy từ Token
         String email = getCurrentUserEmail(); // Lấy từ SecurityContext
-        checkClassExists(classId);
-        return executeWithCatch(() -> classRepository.softDeleteWithCascade(classId, email),
+        ClassEntity existingClass = checkClassExists(classId);
+        String result = executeWithCatch(() -> classRepository.softDeleteWithCascade(classId, email),
                 "Lỗi hệ thống khi xóa lớp học");
+
+        historyService.record(HistoryRequest.builder()
+                .action(ActionType.DELETE)
+                .actorId(email)
+                .actorName(email)
+                .entityType(EntityType.CLASS.name())
+                .entityId(classId)
+                .entityName(existingClass.getClassName())
+                .changes(Map.of("deleted", changed(false, true)))
+                .build());
+
+        return result;
     }
 
     @Override

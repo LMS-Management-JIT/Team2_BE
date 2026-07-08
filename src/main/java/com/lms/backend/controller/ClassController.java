@@ -31,8 +31,16 @@ public class ClassController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER', 'STUDENT')")
-    public ResponseEntity<List<ClassResponse>> getAllClasses() {
-        return ResponseEntity.ok(classService.getAllClasses());
+    public ResponseEntity<Map<String, Object>> getAllClasses(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "7") int size,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String program,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate
+    ) {
+        return ResponseEntity.ok(classService.getAllClasses(page, size, name, program, status, startDate, endDate));
     }
 
     @GetMapping("/{id}")

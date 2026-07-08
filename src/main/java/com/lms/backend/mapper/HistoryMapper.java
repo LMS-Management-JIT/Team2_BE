@@ -57,12 +57,30 @@ public class HistoryMapper {
         map.put("action", entity.getAction() != null ? entity.getAction().name() : null);
         map.put("actor_id", entity.getActorId());
         map.put("actor_name", entity.getActorName());
-        map.put("changes", entity.getChanges());
+        map.put("changes", toChangesMap(entity.getChanges()));
         map.put("created_at", toTimestamp(entity.getCreatedAt()));
         map.put("entity_id", entity.getEntityId());
         map.put("entity_name", entity.getEntityName());
         map.put("entity_type", entity.getEntityType());
         return map;
+    }
+
+    private Map<String, Object> toChangesMap(Map<String, HistoryEntity.ChangeDetail> changes) {
+        if (changes == null) {
+            return null;
+        }
+        Map<String, Object> result = new HashMap<>();
+        for (Map.Entry<String, HistoryEntity.ChangeDetail> entry : changes.entrySet()) {
+            HistoryEntity.ChangeDetail detail = entry.getValue();
+            if (detail == null) {
+                continue;
+            }
+            Map<String, Object> detailMap = new HashMap<>();
+            detailMap.put("old", detail.getOldValue());
+            detailMap.put("new", detail.getNewValue());
+            result.put(entry.getKey(), detailMap);
+        }
+        return result;
     }
 
     private ActionType getAction(DocumentSnapshot doc) {

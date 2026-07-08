@@ -10,8 +10,7 @@ import java.util.Map;
 public interface IClassService {
     String createClass(ClassRequest request);
 
-    List<ClassResponse> getAllClasses();
-
+    Map<String, Object> getAllClasses(int page, int size, String name, String program, String status, String startDate, String endDate);
     ClassDetailResponse getClassDetail(String classId);
 
     List<Map<String, Object>> findAllCourses();
