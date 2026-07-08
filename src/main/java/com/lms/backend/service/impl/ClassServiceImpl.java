@@ -5,14 +5,19 @@ import com.google.cloud.firestore.DocumentSnapshot;
 import com.google.cloud.firestore.Query;
 import com.google.cloud.firestore.QueryDocumentSnapshot;
 import com.lms.backend.dto.request.ClassRequest;
+import com.lms.backend.dto.request.HistoryRequest;
 import com.lms.backend.dto.response.ClassDetailResponse;
 import com.lms.backend.dto.response.ClassResponse;
+import com.lms.backend.entity.ActionType;
 import com.lms.backend.entity.ClassEntity;
+import com.lms.backend.entity.EntityType;
+import com.lms.backend.entity.HistoryEntity;
 import com.lms.backend.exception.BadRequestException;
 import com.lms.backend.exception.ResourceNotFoundException;
 import com.lms.backend.mapper.ClassMapper;
 import com.lms.backend.repository.ClassRepository;
 import com.lms.backend.service.IClassService;
+import com.lms.backend.service.IHistoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.security.core.Authentication;
@@ -28,12 +33,15 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
+import static com.lms.backend.utils.HistoryChangeUtils.changed;
+
 @Service
 @RequiredArgsConstructor
 public class ClassServiceImpl implements IClassService {
 
     private final ClassRepository classRepository;
     private final ClassMapper classMapper;
+    private final IHistoryService historyService;
 
     private <T> T executeWithCatch(Callable<T> task, String errorMessage) {
         try {
@@ -117,7 +125,7 @@ public class ClassServiceImpl implements IClassService {
     public String createClass(ClassRequest request) {
         String email = getCurrentUserEmail();
         validateClassLogic(request, false);
-        return executeWithCatch(() -> {
+        String newId = executeWithCatch(() -> {
             ClassEntity entity = classMapper.toEntity(request);
             entity.setStartDateClass(request.getStartDateClass());
             entity.setCreateDate(LocalDateTime.now());
@@ -125,6 +133,18 @@ public class ClassServiceImpl implements IClassService {
             entity.setDeleted(false);
             return classRepository.save(entity);
         }, "Lỗi hệ thống khi tạo lớp học");
+
+        historyService.record(HistoryRequest.builder()
+                .action(ActionType.ADD)
+                .actorId(email)
+                .actorName(email)
+                .entityType(EntityType.CLASS.name())
+                .entityId(newId)
+                .entityName(request.getClassName())
+                .changes(Map.of())
+                .build());
+
+        return newId;
     }
 
     @Override
@@ -324,20 +344,55 @@ public class ClassServiceImpl implements IClassService {
         String email = getCurrentUserEmail();
         ClassEntity existingClass = checkClassExists(classId);
         validateClassLogic(request, true);
-        return executeWithCatch(() -> {
+
+        Map<String, HistoryEntity.ChangeDetail> changes = new HashMap<>();
+        changes.put("class_name", changed(existingClass.getClassName(), request.getClassName()));
+        changes.put("status", changed(existingClass.getStatus(), request.getStatus()));
+        changes.put("start_date_class", changed(existingClass.getStartDateClass(), request.getStartDateClass()));
+        changes.put("end_date_class", changed(existingClass.getEndDateClass(), request.getEndDateClass()));
+        changes.put("description", changed(existingClass.getDescription(), request.getDescription()));
+        changes.put("note", changed(existingClass.getNote(), request.getNote()));
+        changes.put("programe", changed(existingClass.getPrograme(), request.getPrograme()));
+        changes.put("course_id", changed(existingClass.getCourseId(), request.getCourseId()));
+
+        String result = executeWithCatch(() -> {
             classMapper.updateEntityFromRequest(request, existingClass);
             existingClass.setUpdateDate(LocalDateTime.now());
             existingClass.setUpdateBy(email);
             return classRepository.update(classId, existingClass);
         }, "Lỗi hệ thống khi cập nhật lớp học");
+
+        historyService.record(HistoryRequest.builder()
+                .action(ActionType.UPDATE)
+                .actorId(email)
+                .actorName(email)
+                .entityType(EntityType.CLASS.name())
+                .entityId(classId)
+                .entityName(existingClass.getClassName())
+                .changes(changes)
+                .build());
+
+        return result;
     }
 
     @Override
     public String deleteClass(String classId) { // Bỏ deletedBy ở tham số nếu lấy từ Token
         String email = getCurrentUserEmail(); // Lấy từ SecurityContext
-        checkClassExists(classId);
-        return executeWithCatch(() -> classRepository.softDeleteWithCascade(classId, email),
+        ClassEntity existingClass = checkClassExists(classId);
+        String result = executeWithCatch(() -> classRepository.softDeleteWithCascade(classId, email),
                 "Lỗi hệ thống khi xóa lớp học");
+
+        historyService.record(HistoryRequest.builder()
+                .action(ActionType.DELETE)
+                .actorId(email)
+                .actorName(email)
+                .entityType(EntityType.CLASS.name())
+                .entityId(classId)
+                .entityName(existingClass.getClassName())
+                .changes(Map.of("deleted", changed(false, true)))
+                .build());
+
+        return result;
     }
 
     @Override

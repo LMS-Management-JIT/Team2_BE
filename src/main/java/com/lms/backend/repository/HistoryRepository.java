@@ -1,6 +1,7 @@
 package com.lms.backend.repository;
 
 import com.google.cloud.firestore.CollectionReference;
+import com.google.cloud.firestore.DocumentReference;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.Query;
 import com.lms.backend.entity.HistoryEntity;
@@ -35,5 +36,11 @@ public class HistoryRepository {
                 .stream()
                 .map(historyMapper::fromDocument)
                 .collect(Collectors.toList());
+    }
+
+    public String save(HistoryEntity history) throws Exception {
+        DocumentReference docRef = getHistoryCollection().document();
+        docRef.set(historyMapper.toFirestoreMap(history)).get();
+        return docRef.getId();
     }
 }
