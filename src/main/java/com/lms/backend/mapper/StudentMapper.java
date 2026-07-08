@@ -93,6 +93,8 @@ public class StudentMapper {
         response.setIssuePlace(student.getIssuePlace());
         response.setEducationLevel(student.getEducationLevel());
         response.setAdmissionResult(student.getAdmissionResult());
+        response.setInterviewContent(student.getInterviewContent());
+        response.setDescription(student.getDescription());
         response.setStatus(student.getStatus());
 
         // Profile

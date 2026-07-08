@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class StudentRequest {
@@ -51,4 +52,6 @@ public class StudentRequest {
     private String description;
 
     private String requestedBy;
+
+    private List<String> classIds;
 }

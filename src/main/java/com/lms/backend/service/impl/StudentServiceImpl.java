@@ -4,18 +4,15 @@ import com.google.cloud.firestore.DocumentReference;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.SetOptions;
 import com.lms.backend.dto.request.StudentRequest;
+import com.lms.backend.dto.response.ClassResponse;
 import com.lms.backend.dto.response.StudentResponse;
-import com.lms.backend.entity.AccountEntity;
-import com.lms.backend.entity.ProfileEntity;
-import com.lms.backend.entity.RoleEntity;
-import com.lms.backend.entity.StudentEntity;
+import com.lms.backend.entity.*;
 import com.lms.backend.exception.BadRequestException;
 import com.lms.backend.exception.ResourceNotFoundException;
+import com.lms.backend.mapper.ClassMapper;
+import com.lms.backend.mapper.StudentClassMapper;
 import com.lms.backend.mapper.StudentMapper;
-import com.lms.backend.repository.AccountRepository;
-import com.lms.backend.repository.ProfileRepository;
-import com.lms.backend.repository.RoleRepository;
-import com.lms.backend.repository.StudentRepository;
+import com.lms.backend.repository.*;
 import com.lms.backend.service.IStudentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -29,6 +26,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +39,13 @@ public class StudentServiceImpl implements IStudentService {
     private final StudentMapper studentMapper;
     private final PasswordEncoder passwordEncoder;
     private final RoleRepository roleRepository;
+    private final StudentClassRepository studentClassRepository;
+    private final StudentClassMapper studentClassMapper;
+
+
+    private final ClassRepository classRepository;
+
+    private final ClassMapper classMapper;
 
 
     @Override
@@ -130,10 +135,12 @@ public class StudentServiceImpl implements IStudentService {
     public String createStudent(StudentRequest request) {
         validateStudent(request);
         String email = getCurrentUserEmail();
+
         return executeWithCatch(() -> {
 
             AccountEntity account =
                     studentMapper.toAccountEntity(request);
+
             RoleEntity studentRole = roleRepository.findByName("STUDENT");
             account.setRoleId(studentRole.getId());
 
@@ -147,64 +154,132 @@ public class StudentServiceImpl implements IStudentService {
 
             account.setCreatedBy(email);
             account.setUpdateBy(email);
+
             profile.setCreatedBy(email);
             profile.setUpdatedBy(email);
+
             student.setCreatedBy(email);
             student.setUpdatedBy(email);
 
             return firestore.runTransaction(transaction -> {
 
+                // ==========================
                 // Account
+                // ==========================
                 DocumentReference accountRef =
                         accountRepository.getAccountCollection().document();
+
                 account.setId(accountRef.getId());
+
                 transaction.set(
                         accountRef,
                         studentMapper.accountToFirestoreMap(account)
                 );
 
+                // ==========================
                 // Profile
+                // ==========================
                 DocumentReference profileRef =
                         profileRepository.getProfileCollection().document();
+
                 profile.setId(profileRef.getId());
                 profile.setAccountId(account.getId());
+
                 transaction.set(
                         profileRef,
                         studentMapper.profileToFirestoreMap(profile)
                 );
 
+                // ==========================
                 // Student
+                // ==========================
                 DocumentReference studentRef =
                         studentRepository.getStudentCollection().document();
+
                 student.setId(studentRef.getId());
                 student.setProfileId(profile.getId());
+
                 transaction.set(
                         studentRef,
                         studentMapper.studentToFirestoreMap(student)
                 );
+
+                // ==========================
+                // Student Class (THÊM MỚI)
+                // ==========================
+                if (request.getClassIds() != null) {
+
+                    for (String classId : request.getClassIds()) {
+
+                        StudentClassEntity studentClass =
+                                studentClassMapper.toEntity(classId);
+
+                        studentClass.setStudentId(student.getId());
+
+                        studentClass.setStatus("ACTIVE");
+                        studentClass.setDeleted(false);
+
+                        studentClass.setCreatedBy(email);
+                        studentClass.setUpdatedBy(email);
+
+                        studentClass.setCreateDate(LocalDateTime.now());
+                        studentClass.setUpdateDate(LocalDateTime.now());
+
+                        DocumentReference studentClassRef =
+                                studentClassRepository
+                                        .getStudentClassCollection()
+                                        .document();
+
+                        studentClass.setId(studentClassRef.getId());
+
+                        transaction.set(
+                                studentClassRef,
+                                studentClassMapper.toFirestoreMap(studentClass)
+                        );
+                    }
+                }
+
                 return student.getId();
+
             }).get();
+
         }, "Lỗi hệ thống khi tạo học viên");
     }
 
     @Override
     public List<StudentResponse> getAllStudents() {
         return executeWithCatch(() -> {
+
             List<StudentEntity> students =
                     studentRepository.findAllActive();
+
             return students.stream()
                     .filter(student -> student.getProfileId() != null)
                     .map(student -> {
+
                         ProfileEntity profile =
                                 checkProfileExists(student.getProfileId());
+
                         AccountEntity account =
                                 checkAccountExists(profile.getAccountId());
-                        return studentMapper.toResponse(
-                                account,
-                                profile,
-                                student
+
+                        StudentResponse response =
+                                studentMapper.toResponse(
+                                        account,
+                                        profile,
+                                        student
+                                );
+
+                        response.setClasses(
+                                studentClassRepository.findClassesByStudentId(
+                                        student.getId()
+                                )
                         );
+
+                        return response;
+
                     }).toList();
+
         }, "Lỗi hệ thống khi lấy danh sách học viên");
     }
 
