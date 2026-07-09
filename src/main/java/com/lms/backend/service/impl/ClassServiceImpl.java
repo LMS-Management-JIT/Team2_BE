@@ -84,7 +84,7 @@ public class ClassServiceImpl implements IClassService {
         throw new IllegalStateException("Authentication required");
     }
 
-    private void validateClassLogic(ClassRequest request, boolean isUpdate) {
+    private void validateClassLogic(ClassRequest request, boolean isUpdate, String classId) {
         LocalDateTime now = LocalDateTime.now();
 
         // 1. Kiểm tra ngày kết thúc >= ngày bắt đầu
@@ -119,12 +119,25 @@ public class ClassServiceImpl implements IClassService {
         if ("COMPLETED".equalsIgnoreCase(request.getStatus()) && request.getEndDateClass().isAfter(now)) {
             throw new BadRequestException("Logic sai: Lớp học chưa đến ngày kết thúc, không thể set trạng thái COMPLETED!");
         }
+        String existingClassId = classRepository.findByClassName(request.getClassName());
+
+        if (isUpdate) {
+            // Khi cập nhật: Tìm thấy tên này VÀ ID tìm được KHÁC với ID của lớp đang sửa -> Trùng!
+            if (existingClassId != null && !existingClassId.equals(classId)) {
+                throw new BadRequestException("Tên lớp '" + request.getClassName() + "' đã tồn tại trong hệ thống!");
+            }
+        } else {
+            // Khi tạo mới: Cứ tìm thấy ID nào dùng tên này là báo Trùng!
+            if (existingClassId != null) {
+                throw new BadRequestException("Tên lớp '" + request.getClassName() + "' đã tồn tại trong hệ thống!");
+            }
+        }
     }
 
     @Override
     public String createClass(ClassRequest request) {
         String email = getCurrentUserEmail();
-        validateClassLogic(request, false);
+        validateClassLogic(request, false, null);
         String newId = executeWithCatch(() -> {
             ClassEntity entity = classMapper.toEntity(request);
             entity.setStartDateClass(request.getStartDateClass());
@@ -343,8 +356,7 @@ public class ClassServiceImpl implements IClassService {
     public String updateClass(String classId, ClassRequest request) {
         String email = getCurrentUserEmail();
         ClassEntity existingClass = checkClassExists(classId);
-        validateClassLogic(request, true);
-
+        validateClassLogic(request, true, classId);
         Map<String, HistoryEntity.ChangeDetail> changes = new HashMap<>();
         changes.put("class_name", changed(existingClass.getClassName(), request.getClassName()));
         changes.put("status", changed(existingClass.getStatus(), request.getStatus()));
