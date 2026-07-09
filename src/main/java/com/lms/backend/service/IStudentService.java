@@ -4,6 +4,7 @@ import com.lms.backend.dto.request.StudentRequest;
 import com.lms.backend.dto.response.StudentResponse;
 
 import java.util.List;
+import java.util.Map;
 
 public interface IStudentService {
     long countStudents() throws Exception;
@@ -12,7 +13,10 @@ public interface IStudentService {
     String createStudent(StudentRequest request) throws Exception;
 
     // READ ALL
-    List<StudentResponse> getAllStudents() throws Exception;
+    Map<String, Object> getAllStudents(
+            int page,
+            int size
+    );
 
     // READ DETAIL
     StudentResponse getStudentDetail(String id) throws Exception;

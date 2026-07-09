@@ -32,7 +32,11 @@ public class StudentResponse {
 
     private String admissionResult;
 
+    private String interviewContent;
+
+    private String description;
+
     private String status;
 
-    private List<String> classNames;
+    private List<StudentClassResponse> classes;
 }

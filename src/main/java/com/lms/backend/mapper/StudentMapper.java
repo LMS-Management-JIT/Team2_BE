@@ -14,8 +14,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.threeten.bp.DateTimeUtils.toLocalDateTime;
-
 @Component
 public class StudentMapper {
 
@@ -65,7 +63,7 @@ public class StudentMapper {
                 .interviewContent(request.getInterviewContent())
                 .admissionResult(request.getAdmissionResult())
                 .description(request.getDescription())
-                .status("ACTIVE")
+                .status(request.getStatus())
                 .deleted(false)
                 .createdBy(request.getRequestedBy())
                 .updatedBy(request.getRequestedBy())
@@ -93,6 +91,8 @@ public class StudentMapper {
         response.setIssuePlace(student.getIssuePlace());
         response.setEducationLevel(student.getEducationLevel());
         response.setAdmissionResult(student.getAdmissionResult());
+        response.setInterviewContent(student.getInterviewContent());
+        response.setDescription(student.getDescription());
         response.setStatus(student.getStatus());
 
         // Profile
@@ -136,6 +136,7 @@ public class StudentMapper {
         profile.setDayOfBirth(request.getDayOfBirth());
         profile.setGender(request.getGender());
         profile.setAddress(request.getAddress());
+
     }
 
 
@@ -153,7 +154,10 @@ public class StudentMapper {
         student.setInterviewContent(request.getInterviewContent());
         student.setAdmissionResult(request.getAdmissionResult());
         student.setDescription(request.getDescription());
+        student.setStatus(request.getStatus());
     }
+
+
 
 
 
