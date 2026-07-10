@@ -27,15 +27,15 @@ public class ModuleController {
 
     @GetMapping
     public ResponseEntity<?> getAllModules(
-            @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size,
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam (defaultValue = "10") Integer size,
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String status
     ) {
-        if (page != null && size != null) {
-            return ResponseEntity.ok(moduleService.getAllModulesPage(page, size, name, status));
+        if (page == null && size == null) {
+            return ResponseEntity.ok(moduleService.getAllModules());
         }
-        return ResponseEntity.ok(moduleService.getAllModules());
+        return ResponseEntity.ok(moduleService.getAllModulesPage(page, size, name, status));
     }
 
     @GetMapping("/{id}")
