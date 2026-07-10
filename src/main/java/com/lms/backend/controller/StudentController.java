@@ -75,12 +75,12 @@ public class StudentController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> deleteStudent(
-            @PathVariable String id,
-            @RequestParam String deletedBy)
+            @PathVariable String id
+    )
             throws Exception {
 
         return ResponseEntity.ok(
-                studentService.deleteStudent(id, deletedBy)
+                studentService.deleteStudent(id)
         );
     }
 }

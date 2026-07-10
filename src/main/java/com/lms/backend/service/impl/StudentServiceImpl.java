@@ -3,8 +3,11 @@ package com.lms.backend.service.impl;
 import com.google.cloud.firestore.DocumentReference;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.SetOptions;
+import com.lms.backend.dto.request.HistoryRequest;
 import com.lms.backend.dto.request.StudentClassRequest;
 import com.lms.backend.dto.request.StudentRequest;
+import com.lms.backend.dto.response.StudentClassResponse;
+import com.lms.backend.dto.response.StudentListResponse;
 import com.lms.backend.dto.response.StudentResponse;
 import com.lms.backend.entity.*;
 import com.lms.backend.exception.BadRequestException;
@@ -13,6 +16,7 @@ import com.lms.backend.mapper.ClassMapper;
 import com.lms.backend.mapper.StudentClassMapper;
 import com.lms.backend.mapper.StudentMapper;
 import com.lms.backend.repository.*;
+import com.lms.backend.service.IHistoryService;
 import com.lms.backend.service.IStudentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,6 +32,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
+
+import static com.lms.backend.utils.HistoryChangeUtils.changed;
 
 @Service
 @RequiredArgsConstructor
@@ -42,6 +50,7 @@ public class StudentServiceImpl implements IStudentService {
     private final RoleRepository roleRepository;
     private final StudentClassRepository studentClassRepository;
     private final StudentClassMapper studentClassMapper;
+    private final IHistoryService historyService;
 
 
     private final ClassRepository classRepository;
@@ -137,7 +146,7 @@ public class StudentServiceImpl implements IStudentService {
         validateStudent(request);
         String email = getCurrentUserEmail();
 
-        return executeWithCatch(() -> {
+        String newId = executeWithCatch(() -> {
 
             AccountEntity account =
                     studentMapper.toAccountEntity(request);
@@ -247,6 +256,18 @@ public class StudentServiceImpl implements IStudentService {
             }).get();
 
         }, "Lỗi hệ thống khi tạo học viên");
+        historyService.record(
+                HistoryRequest.builder()
+                        .action(ActionType.ADD)
+                        .actorId(email)
+                        .actorName(email)
+                        .entityType(EntityType.STUDENT.name())
+                        .entityId(newId)
+                        .entityName(request.getFullName())
+                        .changes(Map.of())
+                        .build()
+        );
+        return  newId;
     }
 
     @Override
@@ -275,7 +296,7 @@ public class StudentServiceImpl implements IStudentService {
 
             int toIndex = Math.min(fromIndex + size, totalElements);
 
-            List<StudentResponse> items = new ArrayList<>();
+            List<StudentListResponse> items = new ArrayList<>();
 
             if (fromIndex < totalElements) {
 
@@ -290,8 +311,8 @@ public class StudentServiceImpl implements IStudentService {
                             AccountEntity account =
                                     checkAccountExists(profile.getAccountId());
 
-                            StudentResponse response =
-                                    studentMapper.toResponse(
+                            StudentListResponse response =
+                                    studentMapper.toListResponse(
                                             account,
                                             profile,
                                             student
@@ -351,23 +372,83 @@ public class StudentServiceImpl implements IStudentService {
         }, "Lỗi hệ thống khi lấy thông tin học viên");
     }
 
+    private String formatStudentClasses(List<StudentClassResponse> classes) {
+
+        if (classes == null || classes.isEmpty()) {
+            return "";
+        }
+
+        return classes.stream()
+                .map(c -> c.getClassName() + " (" + c.getStatus() + ")")
+                .collect(Collectors.joining(", "));
+    }
+
+    private String formatStudentClassRequests(List<StudentClassRequest> classes) {
+
+        if (classes == null || classes.isEmpty()) {
+            return "";
+        }
+
+        return classes.stream()
+                .map(c -> {
+                    try {
+                        ClassEntity classEntity =
+                                classRepository.findById(c.getClassId());
+                        String className =
+                                classEntity != null
+                                        ? classEntity.getClassName()
+                                        : c.getClassId();
+                        return className + " (" + c.getStatus() + ")";
+
+                    } catch (ExecutionException | InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                })
+                .collect(Collectors.joining(", "));
+    }
+
     @Override
     public String updateStudent(String id, StudentRequest request) {
 
         validateStudent(request);
 
         String email = getCurrentUserEmail();
+        StudentEntity student =
+                checkStudentExists(id);
 
-        return executeWithCatch(() -> {
+        ProfileEntity profile =
+                checkProfileExists(student.getProfileId());
 
-            StudentEntity student =
-                    checkStudentExists(id);
+        AccountEntity account =
+                checkAccountExists(profile.getAccountId());
 
-            ProfileEntity profile =
-                    checkProfileExists(student.getProfileId());
+        Map<String, HistoryEntity.ChangeDetail> changes = new HashMap<>();
 
-            AccountEntity account =
-                    checkAccountExists(profile.getAccountId());
+        changes.put("full_name", changed(profile.getFullName(), request.getFullName()));
+        changes.put("email", changed(account.getEmail(), request.getEmail()));
+        changes.put("phone_number", changed(profile.getPhoneNumber(), request.getPhoneNumber()));
+        changes.put("gender", changed(profile.getGender(), request.getGender()));
+        changes.put("address", changed(profile.getAddress(), request.getAddress()));
+        changes.put("identity_number", changed(student.getIdentityNumber(), request.getIdentityNumber()));
+        changes.put("issue_date", changed(student.getIssueDate(), request.getIssueDate()));
+        changes.put("issue_place", changed(student.getIssuePlace(), request.getIssuePlace()));
+        changes.put("education_level", changed(student.getEducationLevel(), request.getEducationLevel()));
+        changes.put("interview_content", changed(student.getInterviewContent(), request.getInterviewContent()));
+        changes.put("admission_result", changed(student.getAdmissionResult(), request.getAdmissionResult()));
+        changes.put("description", changed(student.getDescription(), request.getDescription()));
+        changes.put("status", changed(student.getStatus(), request.getStatus()));
+
+        //chi lay
+        changes.put("classes", changed(
+                formatStudentClasses(
+                        studentClassRepository.findClassesByStudentId(student.getId())
+                ),
+                formatStudentClassRequests(
+                        request.getClasses()
+                )
+        ));
+
+        String result = executeWithCatch(() -> {
 
             studentMapper.updateAccount(account, request);
             studentMapper.updateProfile(profile, request);
@@ -420,7 +501,7 @@ public class StudentServiceImpl implements IStudentService {
                             StudentClassEntity.builder()
                                     .studentId(student.getId())
                                     .classId(item.getClassId())
-                                    .status(item.getStatus())
+                                    .status("STUDYING")
                                     .deleted(false)
                                     .createdBy(email)
                                     .updatedBy(email)
@@ -434,45 +515,87 @@ public class StudentServiceImpl implements IStudentService {
 
             return "Cập nhật học viên thành công!";
 
+
         }, "Lỗi hệ thống khi cập nhật học viên");
+        historyService.record(HistoryRequest.builder()
+                .action(ActionType.UPDATE)
+                .actorId(email)
+                .actorName(email)
+                .entityType(EntityType.STUDENT.name())
+                .entityId(student.getId())
+                .entityName(profile.getFullName())
+                .changes(changes)
+                .build());
+
+        return result;
     }
 
     @Override
-    public String deleteStudent(String id, String deletedBy) {
-        return executeWithCatch(() -> {
-            StudentEntity student =
-                    checkStudentExists(id);
-            ProfileEntity profile =
-                    checkProfileExists(student.getProfileId());
-            AccountEntity account =
-                    checkAccountExists(profile.getAccountId());
+    public String deleteStudent(String id) {
+
+        String email = getCurrentUserEmail();
+
+        StudentEntity student =
+                checkStudentExists(id);
+
+        ProfileEntity profile =
+                checkProfileExists(student.getProfileId());
+
+        AccountEntity account =
+                checkAccountExists(profile.getAccountId());
+
+        String result = executeWithCatch(() -> {
+
             account.setDeleted(true);
             profile.setDeleted(true);
             student.setDeleted(true);
 
-            account.setUpdateBy(deletedBy);
-            profile.setUpdatedBy(deletedBy);
-            student.setUpdatedBy(deletedBy);
+            account.setUpdateBy(email);
+            profile.setUpdatedBy(email);
+            student.setUpdatedBy(email);
 
             return firestore.runTransaction(transaction -> {
+
                 transaction.set(
                         accountRepository.getAccountCollection()
                                 .document(account.getId()),
                         studentMapper.accountToFirestoreMap(account),
                         SetOptions.merge());
+
                 transaction.set(
                         profileRepository.getProfileCollection()
                                 .document(profile.getId()),
                         studentMapper.profileToFirestoreMap(profile),
                         SetOptions.merge());
+
                 transaction.set(
                         studentRepository.getStudentCollection()
                                 .document(student.getId()),
                         studentMapper.studentToFirestoreMap(student),
                         SetOptions.merge());
+
                 return "Xóa học viên thành công!";
+
             }).get();
+
         }, "Lỗi hệ thống khi xóa học viên");
+
+        historyService.record(
+                HistoryRequest.builder()
+                        .action(ActionType.DELETE)
+                        .actorId(email)
+                        .actorName(email)
+                        .entityType(EntityType.STUDENT.name())
+                        .entityId(student.getId())
+                        .entityName(profile.getFullName())
+                        .changes(Map.of(
+                                "deleted",
+                                changed(false, true)
+                        ))
+                        .build()
+        );
+
+        return result;
     }
 
 

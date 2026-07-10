@@ -16,8 +16,8 @@ public interface IStudentService {
     Map<String, Object> getAllStudents(
             int page,
             int size
-    );
 
+    );
     // READ DETAIL
     StudentResponse getStudentDetail(String id) throws Exception;
 
@@ -25,7 +25,7 @@ public interface IStudentService {
     String updateStudent(String id, StudentRequest request) throws Exception;
 
     // DELETE
-    String deleteStudent(String id, String deletedBy) throws Exception;
+    String deleteStudent(String id);
 
 
 }
