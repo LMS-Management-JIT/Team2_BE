@@ -63,17 +63,6 @@ public class ClassRepository {
         return null;
     }
 
-    // LẤY THÔNG TIN KHÓA HỌC
-    public Map<String, Object> getCourseById(String courseId) throws ExecutionException, InterruptedException {
-        if (courseId == null || courseId.isEmpty()) return null;
-        DocumentSnapshot doc = firestore.collection("courses").document(courseId).get().get();
-        if (doc.exists()) {
-            Map<String, Object> data = doc.getData();
-            data.put("id", doc.getId());
-            return data;
-        }
-        return null;
-    }
     public List<Map<String, Object>> findAllCourses() throws ExecutionException, InterruptedException {
         List<Map<String, Object>> courses = new ArrayList<>();
         QuerySnapshot snapshot = firestore.collection("courses").whereEqualTo("deleted", false).get().get();

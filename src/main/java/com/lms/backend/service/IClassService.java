@@ -13,8 +13,6 @@ public interface IClassService {
     Map<String, Object> getAllClasses(int page, int size, String name, String program, String status, String startDate, String endDate);
     ClassDetailResponse getClassDetail(String classId);
 
-    List<Map<String, Object>> findAllCourses();
-
     List<Map<String, Object>> getStudentsOfClass(String classId);
 
     List<Map<String, Object>> getTeachersOfClass(String classId);
