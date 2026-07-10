@@ -16,11 +16,17 @@ public class CourseEntity {
     @DocumentId
     private String id;
 
+    @PropertyName("course_code")
+    private String courseCode;
+
     @PropertyName("course_name")
     private String courseName;
 
     @PropertyName("description")
     private String description;
+
+    @PropertyName("status")
+    private String status;
 
     @PropertyName("deleted")
     private boolean deleted;

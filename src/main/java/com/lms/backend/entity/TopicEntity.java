@@ -16,17 +16,26 @@ public class TopicEntity {
     @DocumentId
     private String id;
 
+    @PropertyName("topic_code")
+    private String topicCode;
+
     @PropertyName("topic_name")
     private String topicName;
+
+    @PropertyName("status")
+    private String status;
+
+    @PropertyName("description")
+    private String description;
 
     @PropertyName("deleted")
     private boolean deleted;
 
     @PropertyName("create_date")
-    private LocalDateTime createdAt;
+    private LocalDateTime createdDate;
 
     @PropertyName("update_date")
-    private LocalDateTime updatedAt;
+    private LocalDateTime updatedDate;
 
     @PropertyName("created_by")
     private String createdBy;
