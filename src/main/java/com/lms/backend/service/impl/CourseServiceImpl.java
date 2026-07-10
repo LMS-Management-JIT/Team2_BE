@@ -1,6 +1,8 @@
 package com.lms.backend.service.impl;
 
+import com.lms.backend.mapper.DashboardMapper;
 import com.lms.backend.repository.CourseRepository;
+import com.lms.backend.repository.DashboardRepository;
 import com.lms.backend.service.ICourseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -11,6 +13,7 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class CourseServiceImpl implements ICourseService {
+
 
     private final CourseRepository courseRepository;
 
@@ -31,4 +34,5 @@ public class CourseServiceImpl implements ICourseService {
             throw new RuntimeException("Lỗi hệ thống khi lấy thông tin khóa học: " + e.getMessage(), e);
         }
     }
+
 }

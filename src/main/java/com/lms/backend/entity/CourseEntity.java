@@ -1,14 +1,15 @@
 package com.lms.backend.entity;
 
+import com.google.cloud.Timestamp;
 import com.google.cloud.firestore.annotation.DocumentId;
 import com.google.cloud.firestore.annotation.PropertyName;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class CourseEntity {
@@ -16,24 +17,27 @@ public class CourseEntity {
     @DocumentId
     private String id;
 
-    @PropertyName("course_name")
+    @PropertyName("courseName")
     private String courseName;
 
     @PropertyName("description")
     private String description;
 
+    @PropertyName("thumbnailUrl")
+    private String thumbnailUrl;
+
     @PropertyName("deleted")
     private boolean deleted;
 
-    @PropertyName("created_at")
-    private LocalDateTime createdAt;
+    @PropertyName("createAt")
+    private Timestamp createAt;
 
-    @PropertyName("updated_at")
-    private LocalDateTime updatedAt;
+    @PropertyName("updatedAt")
+    private Timestamp updatedAt;
 
-    @PropertyName("created_by")
+    @PropertyName("createdBy")
     private String createdBy;
 
-    @PropertyName("updated_by")
+    @PropertyName("updatedBy")
     private String updatedBy;
 }
