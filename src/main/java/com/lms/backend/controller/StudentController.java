@@ -37,15 +37,20 @@ public class StudentController {
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public ResponseEntity<Map<String, Object>> getAllStudents(
-
             @RequestParam(defaultValue = "1") int page,
-
-            @RequestParam(defaultValue = "7") int size
-
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String classId,
+            @RequestParam(required = false) String status
     ) {
-
         return ResponseEntity.ok(
-                studentService.getAllStudents(page, size)
+                studentService.getAllStudents(
+                        page,
+                        size,
+                        keyword,
+                        classId,
+                        status
+                )
         );
     }
 

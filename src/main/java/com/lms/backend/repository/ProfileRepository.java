@@ -127,4 +127,38 @@ public class ProfileRepository {
 
         return transactionResult.get();
     }
+
+    public boolean existsByPhoneNumber(String phoneNumber)
+            throws ExecutionException, InterruptedException {
+
+        return !getProfileCollection()
+                .whereEqualTo("phone_number", phoneNumber)
+                .whereEqualTo("deleted", false)
+                .get()
+                .get()
+                .isEmpty();
+    }
+
+    public boolean existsByPhoneNumberExceptId(
+            String phoneNumber,
+            String profileId
+    ) throws ExecutionException, InterruptedException {
+
+        List<QueryDocumentSnapshot> docs =
+                getProfileCollection()
+                        .whereEqualTo("phone_number", phoneNumber)
+                        .whereEqualTo("deleted", false)
+                        .get()
+                        .get()
+                        .getDocuments();
+
+        for (QueryDocumentSnapshot doc : docs) {
+
+            if (!doc.getId().equals(profileId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

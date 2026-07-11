@@ -3,7 +3,6 @@ package com.lms.backend.service;
 import com.lms.backend.dto.request.StudentRequest;
 import com.lms.backend.dto.response.StudentResponse;
 
-import java.util.List;
 import java.util.Map;
 
 public interface IStudentService {
@@ -13,11 +12,8 @@ public interface IStudentService {
     String createStudent(StudentRequest request) throws Exception;
 
     // READ ALL
-    Map<String, Object> getAllStudents(
-            int page,
-            int size
+    Map<String, Object> getAllStudents(int page, int size, String keyword, String classId, String status);
 
-    );
     // READ DETAIL
     StudentResponse getStudentDetail(String id) throws Exception;
 

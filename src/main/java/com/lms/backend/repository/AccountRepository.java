@@ -145,8 +145,7 @@ public class AccountRepository {
         return future.get();
     }
     @Autowired
-    private
-    StudentMapper studentMapper;
+    private StudentMapper studentMapper;
 
     public AccountEntity findEntityById(String id)
             throws ExecutionException, InterruptedException {
@@ -158,6 +157,40 @@ public class AccountRepository {
         }
 
         return studentMapper.accountFromDocument(snapshot);
+    }
+
+    public boolean existsByEmail(String email)
+            throws ExecutionException, InterruptedException {
+
+        return !getAccountCollection()
+                .whereEqualTo("email", email)
+                .whereEqualTo("deleted", false)
+                .get()
+                .get()
+                .isEmpty();
+    }
+
+    public boolean existsByEmailExceptId(
+            String email,
+            String accountId
+    ) throws ExecutionException, InterruptedException {
+
+        List<QueryDocumentSnapshot> docs =
+                getAccountCollection()
+                        .whereEqualTo("email", email)
+                        .whereEqualTo("deleted", false)
+                        .get()
+                        .get()
+                        .getDocuments();
+
+        for (QueryDocumentSnapshot doc : docs) {
+
+            if (!doc.getId().equals(accountId)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
 
