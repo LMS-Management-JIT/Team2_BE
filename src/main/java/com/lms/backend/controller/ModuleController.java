@@ -7,53 +7,49 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/modules")
+@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
-@CrossOrigin("*")
 public class ModuleController {
 
     private final IModuleService moduleService;
 
-    private String getCurrentUserId() {
-        return SecurityContextHolder.getContext().getAuthentication().getName();
+    @PostMapping
+    public ResponseEntity<String> createModule(@Valid @RequestBody ModuleRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body("Tạo thành công Module với ID: " + moduleService.createModule(request));
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER', 'STUDENT')")
-    public ResponseEntity<List<ModuleResponse>> getAllModules() {
-        return ResponseEntity.ok(moduleService.getAllActiveModules());
+    public ResponseEntity<?> getAllModules(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam (defaultValue = "10") Integer size,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String status
+    ) {
+        if (page == null && size == null) {
+            return ResponseEntity.ok(moduleService.getAllModules());
+        }
+        return ResponseEntity.ok(moduleService.getAllModulesPage(page, size, name, status));
     }
 
-    @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ModuleResponse> createModule(@Valid @RequestBody ModuleRequest request) {
-        String currentUserId = getCurrentUserId();
-        ModuleResponse savedModule = moduleService.createModule(request, currentUserId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(savedModule);
+    @GetMapping("/{id}")
+    public ResponseEntity<ModuleResponse> getModuleById(@PathVariable String id) {
+        return ResponseEntity.ok(moduleService.getModuleById(id));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public ResponseEntity<ModuleResponse> updateModule(
-            @PathVariable String id,
-            @Valid @RequestBody ModuleRequest request) {
-        String currentUserId = getCurrentUserId();
-        ModuleResponse updatedModule = moduleService.updateModule(id, request, currentUserId);
-        return ResponseEntity.ok(updatedModule);
+    public ResponseEntity<String> updateModule(@PathVariable String id, @Valid @RequestBody ModuleRequest request) {
+        return ResponseEntity.ok(moduleService.updateModule(id, request));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<String> deleteModule(@PathVariable String id) {
-        String currentUserId = getCurrentUserId();
-        moduleService.softDeleteModule(id, currentUserId);
-        return ResponseEntity.ok("Xóa module thành công!");
+    public ResponseEntity<String> deleteModule(@PathVariable String id, @RequestParam(required = false) String deletedBy) {
+        return ResponseEntity.ok(moduleService.deleteModule(id, deletedBy));
     }
 }

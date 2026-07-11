@@ -4,6 +4,7 @@ import com.lms.backend.dto.request.ClassRequest;
 import com.lms.backend.dto.response.ClassDetailResponse;
 import com.lms.backend.dto.response.ClassResponse;
 import com.lms.backend.service.IClassService;
+import com.lms.backend.service.ICourseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,6 +22,7 @@ import java.util.Map;
 public class ClassController {
 
     private final IClassService classService;
+    private final ICourseService courseService;
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -52,7 +54,7 @@ public class ClassController {
     @GetMapping("/all-courses")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER', 'STUDENT')")
     public ResponseEntity<List<Map<String, Object>>> findAllCourses() {
-        return ResponseEntity.ok(classService.findAllCourses());
+        return ResponseEntity.ok(courseService.findAllCourses());
     }
 
     @GetMapping("/{id}/students")

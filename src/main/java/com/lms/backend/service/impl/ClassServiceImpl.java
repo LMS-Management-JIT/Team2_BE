@@ -17,6 +17,7 @@ import com.lms.backend.exception.ResourceNotFoundException;
 import com.lms.backend.mapper.ClassMapper;
 import com.lms.backend.repository.ClassRepository;
 import com.lms.backend.service.IClassService;
+import com.lms.backend.service.ICourseService;
 import com.lms.backend.service.IHistoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
@@ -42,6 +43,7 @@ public class ClassServiceImpl implements IClassService {
     private final ClassRepository classRepository;
     private final ClassMapper classMapper;
     private final IHistoryService historyService;
+    private final ICourseService courseService;
 
     private <T> T executeWithCatch(Callable<T> task, String errorMessage) {
         try {
@@ -254,17 +256,11 @@ public class ClassServiceImpl implements IClassService {
         BeanUtils.copyProperties(baseResponse, detailResponse);
 
         return executeWithCatch(() -> {
-            detailResponse.setCourse(classRepository.getCourseById(classEntity.getCourseId()));
+            detailResponse.setCourse(courseService.getCourseById(classEntity.getCourseId()));
             detailResponse.setStudents(this.getStudentsOfClass(classId));
             detailResponse.setTeachers(this.getTeachersOfClass(classId));
             return detailResponse;
         }, "Lỗi hệ thống khi lấy chi tiết liên kết của lớp học");
-    }
-
-    @Override
-    public List<Map<String, Object>> findAllCourses() {
-        return executeWithCatch(() -> classRepository.findAllCourses(),
-                "Lỗi hệ thống khi lấy danh sách khóa học");
     }
 
     @Override
