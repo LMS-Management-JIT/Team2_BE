@@ -6,7 +6,6 @@ import com.lms.backend.entity.StudentEntity;
 import com.lms.backend.mapper.StudentMapper;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
@@ -21,50 +20,36 @@ public class StudentRepository {
 
     private final Firestore firestore;
 
+    private final StudentMapper studentMapper;
+
     public CollectionReference getStudentCollection() {
         return firestore.collection("students");
     }
 
     public long countActive() throws Exception {
-        return getStudentCollection()
-                .whereEqualTo("deleted", false)
-                .get().get()
-                .size();
+        return getStudentCollection().whereEqualTo("deleted", false).get().get().size();
     }
 
-
-    @Autowired
-    private StudentMapper studentMapper;
-
     // CREATE
-    public String save(StudentEntity entity)
-            throws ExecutionException, InterruptedException {
+    public String save(StudentEntity entity) throws ExecutionException, InterruptedException {
 
         DocumentReference docRef = getStudentCollection().document();
         entity.setId(docRef.getId());
 
-        ApiFuture<String> transactionResult =
-                firestore.runTransaction(transaction -> {
+        ApiFuture<String> transactionResult = firestore.runTransaction(transaction -> {
 
-                    transaction.set(
-                            docRef,
-                            studentMapper.studentToFirestoreMap(entity)
-                    );
+            transaction.set(docRef, studentMapper.studentToFirestoreMap(entity));
 
-                    return docRef.getId();
-                });
+            return docRef.getId();
+        });
 
         return transactionResult.get();
     }
 
     // READ ONE
-    public StudentEntity findById(String studentId)
-            throws ExecutionException, InterruptedException {
+    public StudentEntity findById(String studentId) throws ExecutionException, InterruptedException {
 
-        DocumentSnapshot snapshot = getStudentCollection()
-                .document(studentId)
-                .get()
-                .get();
+        DocumentSnapshot snapshot = getStudentCollection().document(studentId).get().get();
 
         if (snapshot.exists()) {
             return studentMapper.fromDocument(snapshot);
@@ -74,83 +59,55 @@ public class StudentRepository {
     }
 
     // READ ALL
-    public List<StudentEntity> findAllActive()
-            throws ExecutionException, InterruptedException {
+    public List<StudentEntity> findAllActive() throws ExecutionException, InterruptedException {
 
         List<StudentEntity> result = new ArrayList<>();
-
-        ApiFuture<QuerySnapshot> future = getStudentCollection()
-                .whereEqualTo("deleted", false)
-                .get();
+        ApiFuture<QuerySnapshot> future = getStudentCollection().whereEqualTo("deleted", false).get();
 
         for (QueryDocumentSnapshot doc : future.get().getDocuments()) {
-
             StudentEntity entity = studentMapper.fromDocument(doc);
-
             if (entity != null) {
                 result.add(entity);
             }
         }
-
         return result;
     }
 
     // UPDATE
-    public String update(StudentEntity entity)
-            throws ExecutionException, InterruptedException {
+    public String update(StudentEntity entity) throws ExecutionException, InterruptedException {
 
-        DocumentReference docRef =
-                getStudentCollection().document(entity.getId());
+        DocumentReference docRef = getStudentCollection().document(entity.getId());
 
-        ApiFuture<String> transactionResult =
-                firestore.runTransaction(transaction -> {
+        ApiFuture<String> transactionResult = firestore.runTransaction(transaction -> {
 
-                    transaction.set(
-                            docRef,
-                            studentMapper.studentToFirestoreMap(entity),
-                            SetOptions.merge()
-                    );
+            transaction.set(docRef, studentMapper.studentToFirestoreMap(entity), SetOptions.merge());
 
-                    return "Cập nhật học viên thành công!";
-                });
+            return "Cập nhật học viên thành công!";
+        });
 
         return transactionResult.get();
     }
 
     // SOFT DELETE
-    public String softDelete(StudentEntity entity)
-            throws ExecutionException, InterruptedException {
+    public String softDelete(StudentEntity entity) throws ExecutionException, InterruptedException {
 
-        DocumentReference docRef =
-                getStudentCollection().document(entity.getId());
+        DocumentReference docRef = getStudentCollection().document(entity.getId());
 
-        ApiFuture<String> transactionResult =
-                firestore.runTransaction(transaction -> {
+        ApiFuture<String> transactionResult = firestore.runTransaction(transaction -> {
 
-                    transaction.set(
-                            docRef,
-                            studentMapper.studentToFirestoreMap(entity),
-                            SetOptions.merge()
-                    );
+            transaction.set(docRef, studentMapper.studentToFirestoreMap(entity), SetOptions.merge());
 
-                    return "Đã xóa học viên thành công!";
-                });
+            return "Đã xóa học viên thành công!";
+        });
 
         return transactionResult.get();
     }
 
-    public List<String> getClassNamesByStudentId(String studentId)
-            throws ExecutionException, InterruptedException {
+    public List<String> getClassNamesByStudentId(String studentId) throws ExecutionException, InterruptedException {
 
         List<String> classNames = new ArrayList<>();
 
-        List<QueryDocumentSnapshot> relations = firestore
-                .collection("student_class")
-                .whereEqualTo("student_id", studentId)
-                .whereEqualTo("deleted", false)
-                .get()
-                .get()
-                .getDocuments();
+        List<QueryDocumentSnapshot> relations = firestore.collection("student_class").whereEqualTo("student_id", studentId).whereEqualTo("deleted", false).get().get().getDocuments();
 
         for (QueryDocumentSnapshot relation : relations) {
 
@@ -160,11 +117,7 @@ public class StudentRepository {
                 continue;
             }
 
-            DocumentSnapshot classDoc = firestore
-                    .collection("classes")
-                    .document(classId)
-                    .get()
-                    .get();
+            DocumentSnapshot classDoc = firestore.collection("classes").document(classId).get().get();
 
             if (classDoc.exists()) {
                 classNames.add(classDoc.getString("class_name"));
@@ -174,6 +127,24 @@ public class StudentRepository {
         return classNames;
     }
 
+    public boolean existsByIdentityNumber(String identityNumber) throws ExecutionException, InterruptedException {
+
+        return !getStudentCollection().whereEqualTo("identity_number", identityNumber).whereEqualTo("deleted", false).get().get().isEmpty();
+    }
+
+    public boolean existsByIdentityNumberExceptId(String identityNumber, String studentId) throws ExecutionException, InterruptedException {
+
+        List<QueryDocumentSnapshot> docs = getStudentCollection().whereEqualTo("identity_number", identityNumber).whereEqualTo("deleted", false).get().get().getDocuments();
+
+        for (QueryDocumentSnapshot doc : docs) {
+
+            if (!doc.getId().equals(studentId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
 
 }
