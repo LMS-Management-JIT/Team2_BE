@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -88,6 +89,24 @@ public class AccountRepository {
                 .get()
                 .get()
                 .getDocuments();
+    }
+
+    public List<AccountEntity> findAllActiveEntities()
+            throws ExecutionException, InterruptedException {
+
+        List<AccountEntity> result = new ArrayList<>();
+
+        for (QueryDocumentSnapshot doc : findAllActive()) {
+
+            AccountEntity entity =
+                    accountMapper.fromDocument(doc);
+
+            if (entity != null) {
+                result.add(entity);
+            }
+        }
+
+        return result;
     }
 
     public String update(String accountId, Map<String, Object> updates)

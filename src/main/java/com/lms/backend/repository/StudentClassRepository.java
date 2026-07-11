@@ -2,6 +2,7 @@ package com.lms.backend.repository;
 
 import com.google.api.core.ApiFuture;
 import com.google.cloud.firestore.*;
+import com.lms.backend.dto.request.StudentClassRequest;
 import com.lms.backend.dto.response.ClassResponse;
 import com.lms.backend.dto.response.StudentClassResponse;
 import com.lms.backend.entity.ClassEntity;
@@ -12,8 +13,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 
 @Repository
@@ -111,6 +113,97 @@ public class StudentClassRepository {
             throw new RuntimeException("Lỗi khi lấy danh sách lớp của học viên", e);
         }
     }
+    public void syncStudentClasses(
+            String studentId,
+            List<StudentClassRequest> requests,
+            String updatedBy
+    ) throws ExecutionException, InterruptedException {
+
+        WriteBatch batch = firestore.batch();
+
+        LocalDateTime now = LocalDateTime.now();
+        Date updateDate = Date.from(
+                now.atZone(ZoneId.systemDefault()).toInstant()
+        );
+
+        // Danh sách lớp hiện tại
+        List<StudentClassEntity> oldClasses = findByStudentId(studentId);
+
+        Map<String, StudentClassEntity> oldMap = new HashMap<>();
+
+        for (StudentClassEntity entity : oldClasses) {
+            oldMap.put(entity.getClassId(), entity);
+        }
+
+        Set<String> requestClassIds = new HashSet<>();
+
+        // Insert hoặc Update
+        if (requests != null) {
+
+            for (StudentClassRequest item : requests) {
+
+                requestClassIds.add(item.getClassId());
+
+                StudentClassEntity old = oldMap.get(item.getClassId());
+
+                // ===== Chưa có -> Insert =====
+                if (old == null) {
+
+                    DocumentReference doc =
+                            getStudentClassCollection().document();
+
+                    StudentClassEntity entity =
+                            StudentClassEntity.builder()
+                                    .id(doc.getId())
+                                    .studentId(studentId)
+                                    .classId(item.getClassId())
+                                    .status(item.getStatus())
+                                    .deleted(false)
+                                    .createdBy(updatedBy)
+                                    .updatedBy(updatedBy)
+                                    .createDate(now)
+                                    .updateDate(now)
+                                    .build();
+
+                    batch.set(
+                            doc,
+                            studentClassMapper.toFirestoreMap(entity)
+                    );
+
+                    continue;
+                }
+
+                // ===== Có rồi nhưng status đổi =====
+                if (!old.getStatus().equals(item.getStatus())) {
+
+                    batch.update(
+                            getStudentClassCollection()
+                                    .document(old.getId()),
+                            "status", item.getStatus(),
+                            "updated_by", updatedBy,
+                            "update_date", updateDate
+                    );
+                }
+            }
+        }
+
+        // Soft delete lớp bị bỏ
+        for (StudentClassEntity old : oldClasses) {
+
+            if (!requestClassIds.contains(old.getClassId())) {
+
+                batch.update(
+                        getStudentClassCollection()
+                                .document(old.getId()),
+                        "deleted", true,
+                        "updated_by", updatedBy,
+                        "update_date", updateDate
+                );
+            }
+        }
+
+        batch.commit().get();
+    }
 
     public List<StudentClassResponse> findClassesByStudentId(String studentId) {
 
@@ -181,16 +274,63 @@ public class StudentClassRepository {
     }
 
     // DELETE
-    public void softDeleteByStudentId(String studentId)
+    public void softDeleteByStudentId(
+            String studentId,
+            String updatedBy
+    )
             throws ExecutionException, InterruptedException {
 
-        List<StudentClassEntity> list = findByStudentId(studentId);
+        List<StudentClassEntity> list =
+                findByStudentId(studentId);
+
+        if (list.isEmpty()) {
+            return;
+        }
+
+        WriteBatch batch = firestore.batch();
+
+        Date now = new Date();
 
         for (StudentClassEntity entity : list) {
 
-            entity.setDeleted(true);
+            batch.update(
+                    getStudentClassCollection()
+                            .document(entity.getId()),
+                    "deleted", true,
+                    "update_date", now,
+                    "updated_by", updatedBy
+            );
+        }
 
-            update(entity);
+        batch.commit().get();
+    }
+    public List<StudentClassEntity> findAllActive() {
+
+        try {
+
+            List<StudentClassEntity> result = new ArrayList<>();
+
+            List<QueryDocumentSnapshot> docs =
+                    getStudentClassCollection()
+                            .whereEqualTo("deleted", false)
+                            .get()
+                            .get()
+                            .getDocuments();
+
+            for (QueryDocumentSnapshot doc : docs) {
+
+                StudentClassEntity entity =
+                        studentClassMapper.fromDocument(doc);
+
+                if (entity != null) {
+                    result.add(entity);
+                }
+            }
+
+            return result;
+
+        } catch (ExecutionException | InterruptedException e) {
+            throw new RuntimeException(e);
         }
     }
 }

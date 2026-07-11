@@ -27,12 +27,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.lms.backend.utils.HistoryChangeUtils.changed;
@@ -275,22 +273,48 @@ public class StudentServiceImpl implements IStudentService {
 
         return executeWithCatch(() -> {
 
-            // 1. Lấy toàn bộ học viên đang hoạt động
-            List<StudentEntity> allStudents =
-                    studentRepository.findAllActive();
+            // Load dữ liệu chỉ 1 lần
+            List<StudentEntity> allStudents = studentRepository.findAllActive();
+            List<ProfileEntity> profiles = profileRepository.findAllActive();
+            List<AccountEntity> accounts = accountRepository.findAllActiveEntities();
+            List<StudentClassEntity> studentClasses = studentClassRepository.findAllActive();
+            List<ClassEntity> classes = classRepository.findAllActive();
 
-            // 2. (Có thể thêm filter ở đây sau này)
+            // Lookup Map
+            Map<String, ProfileEntity> profileMap = profiles.stream()
+                    .collect(Collectors.toMap(
+                            ProfileEntity::getId,
+                            Function.identity()
+                    ));
+
+            Map<String, AccountEntity> accountMap = accounts.stream()
+                    .collect(Collectors.toMap(
+                            AccountEntity::getId,
+                            Function.identity()
+                    ));
+
+            Map<String, ClassEntity> classMap = classes.stream()
+                    .collect(Collectors.toMap(
+                            ClassEntity::getId,
+                            Function.identity()
+                    ));
+
+            Map<String, List<StudentClassEntity>> studentClassMap =
+                    studentClasses.stream()
+                            .collect(Collectors.groupingBy(
+                                    StudentClassEntity::getStudentId
+                            ));
+
+            // Filter + sort
             List<StudentEntity> filteredList = allStudents.stream()
                     .filter(student -> student.getProfileId() != null)
                     .sorted((s1, s2) ->
                             s2.getCreateDate().compareTo(s1.getCreateDate()))
                     .toList();
 
-            // 3. Phân trang
             int totalElements = filteredList.size();
 
-            int totalPages =
-                    (int) Math.ceil((double) totalElements / size);
+            int totalPages = (int) Math.ceil((double) totalElements / size);
 
             int fromIndex = (page - 1) * size;
 
@@ -306,10 +330,18 @@ public class StudentServiceImpl implements IStudentService {
                         .map(student -> {
 
                             ProfileEntity profile =
-                                    checkProfileExists(student.getProfileId());
+                                    profileMap.get(student.getProfileId());
+
+                            if (profile == null) {
+                                return null;
+                            }
 
                             AccountEntity account =
-                                    checkAccountExists(profile.getAccountId());
+                                    accountMap.get(profile.getAccountId());
+
+                            if (account == null) {
+                                return null;
+                            }
 
                             StudentListResponse response =
                                     studentMapper.toListResponse(
@@ -318,19 +350,36 @@ public class StudentServiceImpl implements IStudentService {
                                             student
                                     );
 
-                            response.setClasses(
-                                    studentClassRepository.findClassesByStudentId(
-                                            student.getId()
-                                    )
-                            );
+                            List<StudentClassResponse> classResponses =
+                                    studentClassMap
+                                            .getOrDefault(student.getId(), List.of())
+                                            .stream()
+                                            .map(sc -> {
+
+                                                ClassEntity clazz =
+                                                        classMap.get(sc.getClassId());
+
+                                                return StudentClassResponse.builder()
+                                                        .classId(sc.getClassId())
+                                                        .className(
+                                                                clazz != null
+                                                                        ? clazz.getClassName()
+                                                                        : ""
+                                                        )
+                                                        .status(sc.getStatus())
+                                                        .build();
+                                            })
+                                            .toList();
+
+                            response.setClasses(classResponses);
 
                             return response;
 
                         })
+                        .filter(Objects::nonNull)
                         .toList();
             }
 
-            // 4. Trả kết quả
             Map<String, Object> response = new HashMap<>();
 
             response.put("items", items);
@@ -490,28 +539,13 @@ public class StudentServiceImpl implements IStudentService {
             }).get();
 
             // Xóa mềm toàn bộ lớp cũ
-            studentClassRepository.softDeleteByStudentId(student.getId());
+            studentClassRepository.syncStudentClasses(
+                    student.getId(),
+                    request.getClasses(),
+                    email
+            );
 
-            // Thêm lại danh sách lớp mới
-            if (request.getClasses() != null) {
 
-                for (StudentClassRequest item : request.getClasses()) {
-
-                    StudentClassEntity entity =
-                            StudentClassEntity.builder()
-                                    .studentId(student.getId())
-                                    .classId(item.getClassId())
-                                    .status("STUDYING")
-                                    .deleted(false)
-                                    .createdBy(email)
-                                    .updatedBy(email)
-                                    .createDate(now)
-                                    .updateDate(now)
-                                    .build();
-
-                    studentClassRepository.save(entity);
-                }
-            }
 
             return "Cập nhật học viên thành công!";
 
@@ -550,11 +584,17 @@ public class StudentServiceImpl implements IStudentService {
             profile.setDeleted(true);
             student.setDeleted(true);
 
+            LocalDateTime now = LocalDateTime.now();
+
+            account.setUpdateDate(now);
+            profile.setUpdateDate(now);
+            student.setUpdateDate(now);
+
             account.setUpdateBy(email);
             profile.setUpdatedBy(email);
             student.setUpdatedBy(email);
 
-            return firestore.runTransaction(transaction -> {
+            firestore.runTransaction(transaction -> {
 
                 transaction.set(
                         accountRepository.getAccountCollection()
@@ -574,9 +614,16 @@ public class StudentServiceImpl implements IStudentService {
                         studentMapper.studentToFirestoreMap(student),
                         SetOptions.merge());
 
-                return "Xóa học viên thành công!";
+                return null;
 
             }).get();
+
+            studentClassRepository.softDeleteByStudentId(
+                    student.getId(),
+                    email
+            );
+
+            return "Xóa học viên thành công!";
 
         }, "Lỗi hệ thống khi xóa học viên");
 
