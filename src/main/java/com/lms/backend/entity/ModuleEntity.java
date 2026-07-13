@@ -1,16 +1,14 @@
 package com.lms.backend.entity;
 
-import com.google.cloud.Timestamp;
 import com.google.cloud.firestore.annotation.DocumentId;
+import com.google.cloud.firestore.annotation.Exclude;
 import com.google.cloud.firestore.annotation.PropertyName;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.Instant;
 import java.time.LocalDateTime;
-
 
 @Data
 @Builder
@@ -33,15 +31,15 @@ public class ModuleEntity {
     @PropertyName("deleted")
     private boolean deleted;
 
-    @PropertyName("create_date")
-    private LocalDateTime createDate;
-
-    @PropertyName("update_date")
-    private LocalDateTime updateDate;
-
     @PropertyName("created_by")
     private String createdBy;
 
     @PropertyName("update_by")
     private String updateBy;
+
+    @Exclude
+    private LocalDateTime createDate;
+
+    @Exclude
+    private LocalDateTime updateDate;
 }

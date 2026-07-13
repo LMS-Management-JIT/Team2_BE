@@ -2,6 +2,7 @@ package com.lms.backend.mapper;
 
 import com.google.cloud.firestore.DocumentSnapshot;
 import com.lms.backend.dto.request.StudentRequest;
+import com.lms.backend.dto.response.StudentListResponse;
 import com.lms.backend.dto.response.StudentResponse;
 import com.lms.backend.entity.AccountEntity;
 import com.lms.backend.entity.ProfileEntity;
@@ -63,7 +64,7 @@ public class StudentMapper {
                 .interviewContent(request.getInterviewContent())
                 .admissionResult(request.getAdmissionResult())
                 .description(request.getDescription())
-                .status(request.getStatus())
+                .status("ACTIVE")
                 .deleted(false)
                 .createdBy(request.getRequestedBy())
                 .updatedBy(request.getRequestedBy())
@@ -107,6 +108,29 @@ public class StudentMapper {
         // Account
         if (account != null) {
             response.setEmail(account.getEmail());
+        }
+
+        return response;
+    }
+
+    public StudentListResponse toListResponse(
+            AccountEntity account,
+            ProfileEntity profile,
+            StudentEntity student) {
+
+        StudentListResponse response = new StudentListResponse();
+
+        response.setId(student.getId());
+        response.setStatus(student.getStatus());
+
+        if (account != null) {
+            response.setEmail(account.getEmail());
+        }
+
+        if (profile != null) {
+            response.setFullName(profile.getFullName());
+            response.setPhoneNumber(profile.getPhoneNumber());
+            response.setGender(profile.getGender());
         }
 
         return response;

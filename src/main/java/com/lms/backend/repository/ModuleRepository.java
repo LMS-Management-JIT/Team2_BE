@@ -1,16 +1,17 @@
 package com.lms.backend.repository;
 
 import com.google.api.core.ApiFuture;
-import com.google.cloud.Timestamp;
 import com.google.cloud.firestore.*;
+import com.lms.backend.dto.response.PagedResponse;
 import com.lms.backend.entity.ModuleEntity;
-import com.lms.backend.exception.BadRequestException;
+import com.lms.backend.mapper.ModuleMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.util.*;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 @Repository
@@ -18,141 +19,141 @@ import java.util.concurrent.ExecutionException;
 public class ModuleRepository {
 
     private final Firestore firestore;
-    private static final String COLLECTION_NAME = "modules";
+    private final ModuleMapper moduleMapper; // Dùng mapper thay vì Object trực tiếp
 
-    private CollectionReference getModuleCollection() {
+    public CollectionReference getModuleCollection() {
         return firestore.collection("modules");
     }
 
+    // Đếm số lượng cho Dashboard
     public long countActive() throws Exception {
         return getModuleCollection()
                 .whereEqualTo("deleted", false)
                 .get().get()
                 .size();
     }
-    public List<ModuleEntity> findAllActive() {
-        try {
-            CollectionReference moduleRef = firestore.collection(COLLECTION_NAME);
-            ApiFuture<QuerySnapshot> future = moduleRef.whereEqualTo("deleted", false).get();
-            List<QueryDocumentSnapshot> documents = future.get().getDocuments();
 
-            List<ModuleEntity> result = new ArrayList<>();
-            for (QueryDocumentSnapshot doc : documents) {
-                result.add(toEntityWithTimestamps(doc));
+    // CREATE
+    public String save(ModuleEntity entity) throws ExecutionException, InterruptedException {
+        DocumentReference docRef = getModuleCollection().document();
+        entity.setId(docRef.getId());
+
+        ApiFuture<String> transactionResult = firestore.runTransaction(transaction -> {
+            Map<String, Object> dataToSave = moduleMapper.toFirestoreMap(entity);
+            transaction.set(docRef, dataToSave);
+            return docRef.getId();
+        });
+        return transactionResult.get();
+    }
+
+    // READ ALL ACTIVE with basic pagination and optional filtering
+    public PagedResponse<ModuleEntity> findAllActive(int page, int size, String name, String status) throws ExecutionException, InterruptedException {
+        List<ModuleEntity> all = new ArrayList<>();
+        ApiFuture<QuerySnapshot> future = getModuleCollection().whereEqualTo("deleted", false).get();
+        for (QueryDocumentSnapshot doc : future.get().getDocuments()) {
+            ModuleEntity entity = moduleMapper.fromDocument(doc);
+            if (entity != null) all.add(entity);
+        }
+
+        // apply optional server-side filtering (simple contains, case-insensitive)
+        List<ModuleEntity> filtered = new ArrayList<>();
+        for (ModuleEntity e : all) {
+            boolean matches = true;
+            if (name != null && !name.isBlank()) {
+                String en = e.getModuleName() == null ? "" : e.getModuleName();
+                if (!en.toLowerCase().contains(name.toLowerCase())) matches = false;
             }
-            return result;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new BadRequestException("Khong the lay danh sach module");
-        } catch (ExecutionException e) {
-            throw new BadRequestException("Khong the lay danh sach module");
+            // status field not present on ModuleEntity; ignore status filter for now
+            if (matches) filtered.add(e);
         }
+
+        long total = filtered.size();
+        int safeSize = Math.max(1, size);
+        int safePage = Math.max(0, page);
+        int fromIndex = safePage * safeSize;
+        int toIndex = Math.min(fromIndex + safeSize, filtered.size());
+        List<ModuleEntity> pageItems = new ArrayList<>();
+        if (fromIndex < filtered.size()) {
+            pageItems = filtered.subList(fromIndex, toIndex);
+        }
+
+        int totalPages = (int) ((total + safeSize - 1) / safeSize);
+
+        return new com.lms.backend.dto.response.PagedResponse<>(pageItems, total, safePage, safeSize, totalPages);
+    }
+    public List<ModuleEntity> findAllActiveByIds(List<String> ids) throws ExecutionException, InterruptedException {
+        List<ModuleEntity> result = new ArrayList<>();
+        ApiFuture<QuerySnapshot> future = getModuleCollection()
+                .whereIn(FieldPath.documentId(), ids)
+                .whereEqualTo("deleted", false)
+                .get();
+
+        for (QueryDocumentSnapshot doc : future.get().getDocuments()) {
+            ModuleEntity entity = moduleMapper.fromDocument(doc);
+            if (entity != null) result.add(entity);
+        }
+        return result;
     }
 
-    public Optional<ModuleEntity> findById(String id) {
-        try {
-            DocumentReference docRef = firestore.collection(COLLECTION_NAME).document(id);
-            DocumentSnapshot snapshot = docRef.get().get();
 
-            if (!snapshot.exists()) {
-                return Optional.empty();
-            }
-            return Optional.ofNullable(toEntityWithTimestamps(snapshot));
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new BadRequestException("Khong the tim module");
-        } catch (ExecutionException e) {
-            throw new BadRequestException("Khong the tim module");
+
+    // READ DETAIL BY ID
+    public ModuleEntity findById(String id) throws ExecutionException, InterruptedException {
+        DocumentSnapshot doc = getModuleCollection().document(id).get().get();
+        if (doc.exists()) {
+            return moduleMapper.fromDocument(doc);
         }
+        return null;
     }
 
-    public ModuleEntity save(ModuleEntity entity, String userId) {
-        try {
-            CollectionReference moduleRef = firestore.collection(COLLECTION_NAME);
-            DocumentReference newDocRef = moduleRef.document();
+    // UPDATE
+    public String update(String moduleId, ModuleEntity updatedEntity) throws ExecutionException, InterruptedException {
+        DocumentReference docRef = getModuleCollection().document(moduleId);
 
-            Map<String, Object> data = new HashMap<>();
-            data.put("module_name", entity.getModuleName());
-            data.put("module_code", entity.getModuleCode());
-            data.put("description", entity.getDescription());
-            data.put("deleted", false);
-            data.put("created_by", userId);
-            data.put("update_by", userId);
-            data.put("create_date", Timestamp.now());
-            data.put("update_date", Timestamp.now());
-
-            newDocRef.set(data).get();
-
-            DocumentSnapshot savedDoc = newDocRef.get().get();
-            return toEntityWithTimestamps(savedDoc);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new BadRequestException("Khong the tao module");
-        } catch (ExecutionException e) {
-            throw new BadRequestException("Khong the tao module");
-        }
+        ApiFuture<String> transactionResult = firestore.runTransaction(transaction -> {
+            Map<String, Object> dataToUpdate = moduleMapper.toFirestoreMap(updatedEntity);
+            transaction.set(docRef, dataToUpdate, SetOptions.merge());
+            return "Cập nhật thành công Module: " + moduleId;
+        });
+        return transactionResult.get();
     }
 
-    public ModuleEntity update(String id, ModuleEntity entity, String userId) {
-        try {
-            DocumentReference docRef = firestore.collection(COLLECTION_NAME).document(id);
+    // SOFT DELETE
+    public String softDelete(String moduleId, String deletedBy) throws ExecutionException, InterruptedException {
+        DocumentReference docRef = getModuleCollection().document(moduleId);
 
-            Map<String, Object> data = new HashMap<>();
-            data.put("module_name", entity.getModuleName());
-            data.put("module_code", entity.getModuleCode());
-            data.put("description", entity.getDescription());
-            data.put("update_by", userId);
-            data.put("update_date", Timestamp.now());
-
-            docRef.update(data).get();
-
-            DocumentSnapshot updatedDoc = docRef.get().get();
-            return toEntityWithTimestamps(updatedDoc);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new BadRequestException("Khong the cap nhat module");
-        } catch (ExecutionException e) {
-            throw new BadRequestException("Khong the cap nhat module");
-        }
+        ApiFuture<String> future = firestore.runTransaction(transaction -> {
+            transaction.update(docRef,
+                    "deleted", true,
+                    "update_date", Instant.now(),
+                    "update_by", deletedBy
+            );
+            return "Đã xóa mềm Module thành công!";
+        });
+        return future.get();
     }
+    public ModuleEntity findSmartByIdOrCode(String identifier) throws ExecutionException, InterruptedException {
+        if (identifier == null || identifier.isBlank()) return null;
 
-    public void softDelete(String id, String userId) {
-        try {
-            DocumentReference docRef = firestore.collection(COLLECTION_NAME).document(id);
-
-            Map<String, Object> data = new HashMap<>();
-            data.put("deleted", true);
-            data.put("update_by", userId);
-            data.put("update_date", Timestamp.now());
-
-            docRef.update(data).get();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new BadRequestException("Khong the xoa module");
-        } catch (ExecutionException e) {
-            throw new BadRequestException("Khong the xoa module");
+        // 1. ƯU TIÊN 1: Thử tìm chính xác theo Document ID của Firestore (VD: FSvPf9BiCHBe4xjSQN5W)
+        DocumentSnapshot doc = getModuleCollection().document(identifier).get().get();
+        if (doc.exists()) {
+            return moduleMapper.fromDocument(doc);
         }
-    }
 
-    private ModuleEntity toEntityWithTimestamps(DocumentSnapshot doc) {
-        ModuleEntity entity = doc.toObject(ModuleEntity.class);
-        if (entity == null) {
-            return null;
-        }
-        // THÊM MỚI — đọc thủ công vì Lombok không copy @PropertyName sang getter/setter
-        entity.setModuleName(doc.getString("module_name"));
-        entity.setModuleCode(doc.getString("module_code"));
-        entity.setCreatedBy(doc.getString("created_by"));
-        entity.setUpdateBy(doc.getString("update_by"));
-        Timestamp createTs = doc.getTimestamp("create_date");
-        Timestamp updateTs = doc.getTimestamp("update_date");
+        // 2. ƯU TIÊN 2: Nếu không thấy, tự động chuyển sang dò trong cột `module_code` (VD: 03281432-c940-...)
+        QuerySnapshot queryByCode = getModuleCollection()
+                .whereEqualTo("module_code", identifier)
+                .whereEqualTo("deleted", false)
+                .limit(1)
+                .get()
+                .get();
 
-        if (createTs != null) {
-            entity.setCreateDate(LocalDateTime.ofInstant(createTs.toDate().toInstant(), ZoneId.systemDefault()));
+        if (!queryByCode.isEmpty()) {
+            return moduleMapper.fromDocument(queryByCode.getDocuments().get(0));
         }
-        if (updateTs != null) {
-            entity.setUpdateDate(LocalDateTime.ofInstant(updateTs.toDate().toInstant(), ZoneId.systemDefault()));
-        }
-        return entity;
+
+        // 3. Nếu vẫn không thấy, trả về null để code bên ngoài tự bỏ qua
+        return null;
     }
 }

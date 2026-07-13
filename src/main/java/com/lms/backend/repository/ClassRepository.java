@@ -63,17 +63,6 @@ public class ClassRepository {
         return null;
     }
 
-    // LẤY THÔNG TIN KHÓA HỌC
-    public Map<String, Object> getCourseById(String courseId) throws ExecutionException, InterruptedException {
-        if (courseId == null || courseId.isEmpty()) return null;
-        DocumentSnapshot doc = firestore.collection("courses").document(courseId).get().get();
-        if (doc.exists()) {
-            Map<String, Object> data = doc.getData();
-            data.put("id", doc.getId());
-            return data;
-        }
-        return null;
-    }
     public List<Map<String, Object>> findAllCourses() throws ExecutionException, InterruptedException {
         List<Map<String, Object>> courses = new ArrayList<>();
         QuerySnapshot snapshot = firestore.collection("courses").whereEqualTo("deleted", false).get().get();
@@ -148,6 +137,38 @@ public class ClassRepository {
 
         batch.commit().get();
         return "Đã xóa mềm Lớp học và dọn dẹp các liên kết liên quan thành công!";
+    }
+
+    // KIỂM TRA TRÙNG TÊN LỚP (Bỏ qua những lớp đã bị xóa mềm)
+    public boolean existsByClassName(String className) {
+        try {
+            List<QueryDocumentSnapshot> docs = getClassCollection()
+                    .whereEqualTo("class_name", className) // Đảm bảo tên trường khớp với DB (class_name hoặc className)
+                    .whereEqualTo("deleted", false)
+                    .get().get().getDocuments();
+            return !docs.isEmpty();
+        } catch (InterruptedException | ExecutionException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Lỗi khi truy vấn tên lớp học", e);
+        }
+    }
+
+    // LẤY LỚP HỌC THEO TÊN (Dùng khi Update)
+    public String findByClassName(String className) {
+        try {
+            List<QueryDocumentSnapshot> docs = getClassCollection()
+                    .whereEqualTo("class_name", className) // Đảm bảo tên trường khớp với DB
+                    .whereEqualTo("deleted", false)
+                    .get().get().getDocuments();
+
+            if (!docs.isEmpty()) {
+                return docs.get(0).getId();
+            }
+            return null;
+        } catch (InterruptedException | ExecutionException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Lỗi khi truy vấn tên lớp học", e);
+        }
     }
 
     public long countActive() throws Exception {
