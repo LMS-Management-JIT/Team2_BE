@@ -221,8 +221,15 @@ public class ClassServiceImpl implements IClassService {
                         }
                         return true;
                     })
-                    // Thêm sắp xếp nếu muốn (VD: mới nhất lên đầu)
-                    .sorted((c1, c2) -> c2.getCreateDate().compareTo(c1.getCreateDate()))
+                    .sorted((c1, c2) -> {
+                        int dateCompare = c2.getCreateDate().compareTo(c1.getCreateDate());
+                        if (dateCompare == 0) {
+                            if (c1.getId() != null && c2.getId() != null) {
+                                return c1.getId().compareTo(c2.getId());
+                            }
+                        }
+                        return dateCompare;
+                    })
                     .collect(Collectors.toList());
 
             // 5. Phân trang thủ công trên list đã lọc
