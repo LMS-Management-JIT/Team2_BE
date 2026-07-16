@@ -18,8 +18,14 @@ public class TopicEntity {
     @DocumentId
     private String id;
 
+    @PropertyName("topic_code")
+    private String topicCode;
+
     @PropertyName("topic_name")
     private String topicName;
+
+    @PropertyName("description")
+    private String description;
 
     @PropertyName("deleted")
     private boolean deleted;

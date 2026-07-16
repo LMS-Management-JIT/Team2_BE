@@ -1,11 +1,18 @@
 package com.lms.backend.mapper;
 
+import com.google.cloud.firestore.DocumentSnapshot;
 import com.lms.backend.dto.request.LessonRequest;
 import com.lms.backend.dto.response.LessonResponse;
 import com.lms.backend.entity.LessonEntity;
+import com.lms.backend.entity.LessonType;
+import com.lms.backend.entity.TopicEntity;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Date;
+
+import static org.threeten.bp.DateTimeUtils.toLocalDateTime;
 
 @Component
 public class LessonMapper {
@@ -34,7 +41,38 @@ public class LessonMapper {
                 .updatedAt(LocalDateTime.now())
                 .build();
     }
+    public LessonEntity fromDocument(DocumentSnapshot doc)
+    {
+        if (doc == null || !doc.exists()) return null;
+        LessonEntity lesson = LessonEntity.builder()
+                .id(doc.getId())
+                .type(LessonType.valueOf(doc.getString("type")))
+                .lessonName(doc.getString("lessonName"))
+                .lessonOrder(Math.toIntExact(doc.getLong("lessonOrder")))
+                .published(doc.getBoolean("published"))
+                .content(doc.getString("content"))
+                .videoUrl(doc.getString("videoUrl"))
+                .duration(Math.toIntExact(doc.getLong("duration")))
+                .description(doc.getString("description"))
+                .starterCode(doc.getString("starterCode"))
+                .language(doc.getString("language"))
+                .deleted(doc.getBoolean("deleted") != null ? doc.getBoolean("deleted") : false)
+                .createdBy(doc.getString("created_by"))
+                .updatedBy(doc.getString("updated_by"))
+                .createdAt(toLocalDateTime(doc.getDate("create_date")))
+                .updatedAt(toLocalDateTime(doc.getDate("update_date")))
+                .build();
+        return lesson;
+    }
+    private Date toTimestamp(LocalDateTime localDateTime) {
+        if (localDateTime == null) return null;
+        return Date.from(localDateTime.atZone(ZoneId.systemDefault()).toInstant());
+    }
 
+    private LocalDateTime toLocalDateTime(Date date) {
+        if (date == null) return null;
+        return LocalDateTime.ofInstant(date.toInstant(), ZoneId.systemDefault());
+    }
     /**
      * Chuyển Lesson -> LessonResponse
      */

@@ -2,6 +2,7 @@ package com.lms.backend.service.impl;
 
 import com.lms.backend.dto.request.LessonRequest;
 import com.lms.backend.dto.response.LessonResponse;
+import com.lms.backend.dto.response.PagedResponse;
 import com.lms.backend.entity.LessonEntity;
 import com.lms.backend.mapper.LessonMapper;
 import com.lms.backend.repository.LessonRepository;
@@ -81,5 +82,10 @@ public class LessonServiceImpl implements ILessonService {
         }
 
         lessonRepository.deleteById(lessonId);
+    }
+
+    @Override
+    public PagedResponse<LessonResponse> getLessonsByTopic(String topicId, int page, int size, String name, String status) {
+        return null;
     }
 }
