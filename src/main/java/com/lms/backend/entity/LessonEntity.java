@@ -21,9 +21,6 @@ public class LessonEntity {
     @PropertyName("lesson_name")
     private String lessonName;
 
-    @PropertyName("lesson_order")
-    private Integer lessonOrder;
-
     @PropertyName("published")
     private Boolean published;
 

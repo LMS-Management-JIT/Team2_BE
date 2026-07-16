@@ -22,6 +22,7 @@ public class DashboardController {
 
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public DashboardResponse getDashboard() {
         return dashboardService.getDashboardData();
     }
