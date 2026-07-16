@@ -2,6 +2,7 @@ package com.lms.backend.service;
 
 import com.lms.backend.dto.response.LessonSummaryResponse;
 import com.lms.backend.dto.response.PagedResponse;
+import com.lms.backend.dto.response.TopicResponse;
 import com.lms.backend.dto.response.TopicWithLessonsResponse;
 
 import java.util.List;

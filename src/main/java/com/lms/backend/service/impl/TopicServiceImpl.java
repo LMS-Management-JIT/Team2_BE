@@ -1,7 +1,9 @@
 package com.lms.backend.service.impl;
 
+import com.google.cloud.firestore.annotation.PropertyName;
 import com.lms.backend.dto.response.LessonSummaryResponse;
 import com.lms.backend.dto.response.PagedResponse;
+import com.lms.backend.dto.response.TopicResponse;
 import com.lms.backend.dto.response.TopicWithLessonsResponse; // Dùng class này làm Core lồng nhau
 import com.lms.backend.entity.*;
 import com.lms.backend.exception.BadRequestException;
@@ -44,18 +46,6 @@ public class TopicServiceImpl implements ITopicService {
         return topicRepository.getTopicDetail(topicId);
     }
 
-    @Override
-    public PagedResponse<TopicWithLessonsResponse> getAllTopics(int page, int size, String name, String status) throws ExecutionException, InterruptedException {
-        return executeWithCatch(() -> {
-            PagedResponse<TopicEntity> entityPage = topicRepository.findAllActive(page, size, name, status);
-            List<TopicWithLessonsResponse> responseList = entityPage.getItems().stream()
-                    .map(topicMapper::toWithLessonsResponse)
-                    .collect(Collectors.toList());
-
-            return new PagedResponse<>(responseList, entityPage.getTotalItems(), entityPage.getPage(), entityPage.getSize(), entityPage.getTotalPages());
-        }, "Lỗi khi lấy danh sách Topic theo trang");
-    }
-
     private <T> T executeWithCatch(Callable<T> task, String errorMessage) {
         try {
             return task.call();
@@ -64,5 +54,17 @@ public class TopicServiceImpl implements ITopicService {
         } catch (Exception e) {
             throw new RuntimeException(errorMessage + ": " + e.getMessage(), e);
         }
+    }
+
+    @Override
+    public PagedResponse<TopicWithLessonsResponse> getAllTopics(int page, int size, String name, String status) {
+        return executeWithCatch(() -> {
+            PagedResponse<TopicEntity> entityPage = topicRepository.findAllActive(page, size, name, status);
+            List<TopicWithLessonsResponse> responseList = entityPage.getItems().stream()
+                    .map(topicMapper::toWithLessonsResponse)
+                    .collect(Collectors.toList());
+
+            return new PagedResponse<>(responseList, entityPage.getTotalItems(), entityPage.getPage(), entityPage.getSize(), entityPage.getTotalPages());
+        }, "Lỗi khi lấy danh sách Topic theo trang");
     }
 }
