@@ -102,7 +102,6 @@ public class TopicMapper {
                 .id(lesson.getId())
                 .lessonName(lesson.getLessonName())
                 .type(lesson.getType())
-                .lessonOrder(lesson.getLessonOrder())
                 .duration(lesson.getDuration())
                 .published(lesson.getPublished())
                 .build();

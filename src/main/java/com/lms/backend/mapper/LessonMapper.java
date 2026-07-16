@@ -29,7 +29,6 @@ public class LessonMapper {
         return LessonEntity.builder()
                 .lessonName(request.getLessonName())
                 .type(request.getType())
-                .lessonOrder(request.getLessonOrder())
                 .published(request.getPublished())
                 .content(request.getContent())
                 .videoUrl(request.getVideoUrl())
@@ -44,17 +43,31 @@ public class LessonMapper {
     public LessonEntity fromDocument(DocumentSnapshot doc)
     {
         if (doc == null || !doc.exists()) return null;
+
+        String typeStr = doc.getString("type");
+        LessonType type = typeStr == null ? null : LessonType.valueOf(typeStr);
+
+        Long lessonOrderLong = doc.getLong("lessonOrder");
+        if (lessonOrderLong == null) lessonOrderLong = doc.getLong("lesson_order");
+        Integer lessonOrder = lessonOrderLong == null ? null : Math.toIntExact(lessonOrderLong);
+
+        Long durationLong = doc.getLong("duration");
+        Integer duration = durationLong == null ? null : Math.toIntExact(durationLong);
+
+        String lessonName = doc.getString("lessonName") == null ? doc.getString("lesson_name") : doc.getString("lessonName");
+        String videoUrl = doc.getString("videoUrl") == null ? doc.getString("video_url") : doc.getString("videoUrl");
+        String starterCode = doc.getString("starterCode") == null ? doc.getString("starter_code") : doc.getString("starterCode");
+
         LessonEntity lesson = LessonEntity.builder()
                 .id(doc.getId())
-                .type(LessonType.valueOf(doc.getString("type")))
-                .lessonName(doc.getString("lessonName"))
-                .lessonOrder(Math.toIntExact(doc.getLong("lessonOrder")))
+                .type(type)
+                .lessonName(lessonName)
                 .published(doc.getBoolean("published"))
                 .content(doc.getString("content"))
-                .videoUrl(doc.getString("videoUrl"))
-                .duration(Math.toIntExact(doc.getLong("duration")))
+                .videoUrl(videoUrl)
+                .duration(duration)
                 .description(doc.getString("description"))
-                .starterCode(doc.getString("starterCode"))
+                .starterCode(starterCode)
                 .language(doc.getString("language"))
                 .deleted(doc.getBoolean("deleted") != null ? doc.getBoolean("deleted") : false)
                 .createdBy(doc.getString("created_by"))
@@ -86,7 +99,6 @@ public class LessonMapper {
                 .id(lesson.getId())
                 .lessonName(lesson.getLessonName())
                 .type(lesson.getType())
-                .lessonOrder(lesson.getLessonOrder())
                 .published(lesson.getPublished())
                 .content(lesson.getContent())
                 .videoUrl(lesson.getVideoUrl())
@@ -106,7 +118,6 @@ public class LessonMapper {
 
         lesson.setLessonName(request.getLessonName());
         lesson.setType(request.getType());
-        lesson.setLessonOrder(request.getLessonOrder());
         lesson.setPublished(request.getPublished());
 
         lesson.setContent(request.getContent());
