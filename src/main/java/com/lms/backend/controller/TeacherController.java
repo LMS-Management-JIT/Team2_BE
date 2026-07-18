@@ -10,7 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/teachers")
@@ -23,60 +23,41 @@ public class TeacherController {
     // CREATE
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<String> createTeacher(
-            @Valid @RequestBody TeacherRequest request) throws Exception {
+    public ResponseEntity<String> createTeacher(@Valid @RequestBody TeacherRequest request) throws Exception {
 
         String id = teacherService.createTeacher(request);
 
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body("Tạo thành công giảng viên với ID: " + id);
+        return ResponseEntity.status(HttpStatus.CREATED).body("Tạo thành công giảng viên với ID: " + id);
     }
 
-    // READ ALL
+    // READ ALL (phân trang + filter)
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public ResponseEntity<List<TeacherResponse>> getAllTeachers()
-            throws Exception {
-
-        return ResponseEntity.ok(
-                teacherService.getAllTeachers()
-        );
+    public ResponseEntity<Map<String, Object>> getAllTeachers(@RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size, @RequestParam(required = false) String keyword, @RequestParam(required = false) String classId, @RequestParam(required = false) Boolean available) {
+        return ResponseEntity.ok(teacherService.getAllTeachers(page, size, keyword, classId, available));
     }
 
     // DETAIL
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public ResponseEntity<TeacherResponse> getTeacherDetail(
-            @PathVariable String id) throws Exception {
+    public ResponseEntity<TeacherResponse> getTeacherDetail(@PathVariable String id) throws Exception {
 
-        return ResponseEntity.ok(
-                teacherService.getTeacherDetail(id)
-        );
+        return ResponseEntity.ok(teacherService.getTeacherDetail(id));
     }
 
     // UPDATE
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public ResponseEntity<String> updateTeacher(
-            @PathVariable String id,
-            @Valid @RequestBody TeacherRequest request)
-            throws Exception {
+    public ResponseEntity<String> updateTeacher(@PathVariable String id, @Valid @RequestBody TeacherRequest request) throws Exception {
 
-        return ResponseEntity.ok(
-                teacherService.updateTeacher(id, request)
-        );
+        return ResponseEntity.ok(teacherService.updateTeacher(id, request));
     }
 
     // DELETE
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<String> deleteTeacher(
-            @PathVariable String id,
-            @RequestParam String deletedBy)
-            throws Exception {
+    public ResponseEntity<String> deleteTeacher(@PathVariable String id) throws Exception {
 
-        return ResponseEntity.ok(
-                teacherService.deleteTeacher(id, deletedBy)
-        );
+        return ResponseEntity.ok(teacherService.deleteTeacher(id));
     }
 }

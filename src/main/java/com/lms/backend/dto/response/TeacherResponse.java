@@ -11,7 +11,13 @@ public class TeacherResponse {
 
     private String id;
 
-    private String profileId;
+    private String fullName;
+
+    private String email;
+
+    private String phoneNumber;
+
+    private LocalDateTime dayOfBirth;
 
     private String specialization;
 
@@ -31,6 +37,10 @@ public class TeacherResponse {
 
     private String updatedBy;
 
-    private List<String> classNames;
+    private String gender;
+
+    private String address;
+
+    private List<TeacherClassResponse> classes;
 
 }
