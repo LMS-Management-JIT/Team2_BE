@@ -80,4 +80,10 @@ public class ClassController {
     public ResponseEntity<String> deleteClass(@PathVariable String id) {
         return ResponseEntity.ok(classService.deleteClass(id));
     }
+
+    @GetMapping("/{id}/sessions")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER', 'STUDENT')")
+    public ResponseEntity<List<Map<String, Object>>> getClassSessions(@PathVariable String id) {
+        return ResponseEntity.ok(classService.getClassSessions(id));
+    }
 }

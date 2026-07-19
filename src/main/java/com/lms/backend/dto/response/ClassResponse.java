@@ -2,6 +2,8 @@ package com.lms.backend.dto.response;
 
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.List;
+
 
 @Data
 public class ClassResponse {
@@ -10,6 +12,10 @@ public class ClassResponse {
     private String description;
     private String programe;
     private String status;
+
+    private List<Integer> scheduleDays;
+    private String startTime;
+    private String endTime;
 
     private LocalDateTime startDateClass;
     private LocalDateTime endDateClass;

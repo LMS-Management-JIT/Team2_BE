@@ -12,7 +12,9 @@ import lombok.NoArgsConstructor;
 public class TeacherClassResponse {
 
     private String classId;
-
     private String className;
-
+    private String program;
+    private String startDate;
+    private String endDate;
+    private String status;
 }

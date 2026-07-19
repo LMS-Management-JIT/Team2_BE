@@ -88,5 +88,15 @@ public class TeacherRepository {
         return transactionResult.get();
     }
 
+    public TeacherEntity findByProfileId(String profileId) throws ExecutionException, InterruptedException {
+        List<QueryDocumentSnapshot> docs = getTeacherCollection()
+                .whereEqualTo("profile_id", profileId)
+                .whereEqualTo("deleted", false)
+                .get().get().getDocuments();
 
+        if (!docs.isEmpty()) {
+            return teacherMapper.fromDocument(docs.get(0));
+        }
+        return null;
+    }
 }
