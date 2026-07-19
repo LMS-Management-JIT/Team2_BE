@@ -101,6 +101,18 @@ public class ProfileRepository {
         return transactionResult.get();
     }
 
+    public ProfileEntity findByAccountId(String accountId) throws ExecutionException, InterruptedException {
+        List<QueryDocumentSnapshot> docs = getProfileCollection()
+                .whereEqualTo("account_id", accountId)
+                .whereEqualTo("deleted", false)
+                .get().get().getDocuments();
+
+        if (!docs.isEmpty()) {
+            return studentMapper.profileFromDocument(docs.get(0));
+        }
+        return null;
+    }
+
     public boolean existsByPhoneNumber(String phoneNumber) throws ExecutionException, InterruptedException {
 
         return !getProfileCollection().whereEqualTo("phone_number", phoneNumber).whereEqualTo("deleted", false).get().get().isEmpty();

@@ -6,6 +6,7 @@ import com.google.cloud.firestore.SetOptions;
 import com.lms.backend.dto.request.HistoryRequest;
 import com.lms.backend.dto.request.TeacherClassRequest;
 import com.lms.backend.dto.request.TeacherRequest;
+import com.lms.backend.dto.request.AttendanceRequest;
 import com.lms.backend.dto.response.*;
 import com.lms.backend.entity.*;
 import com.lms.backend.exception.BadRequestException;
@@ -21,12 +22,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
+import com.lms.backend.entity.ClassSessionEntity;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -44,16 +44,16 @@ public class TeacherServiceImpl implements ITeacherService {
     private final RoleRepository roleRepository;
     private final ClassRepository classRepository;
     private final TeacherClassRepository teacherClassRepository;
+    private final ClassSessionRepository classSessionRepository;
+    private final StudentClassRepository studentClassRepository;
+    private final AttendanceRepository attendanceRepository;
+    private final StudentRepository studentRepository;
 
     private final TeacherMapper teacherMapper;
     private final TeacherClassMapper teacherClassMapper;
 
     private final PasswordEncoder passwordEncoder;
     private final IHistoryService historyService;
-
-    // ==========================================
-    // OVERRIDE METHODS
-    // ==========================================
 
     @Override
     public long countTeachers() throws Exception {
@@ -323,10 +323,18 @@ public class TeacherServiceImpl implements ITeacherService {
     }
 
     @Override
-    public Map<String, Object> getClassesByTeacher(String teacherId, int page, int size) {
+    public Map<String, Object> getClassesByTeacher(
+            String teacherId,
+            int page,
+            int size,
+            String name,
+            String program,
+            String status,
+            String startDate,
+            String endDate
+    ) {
         return executeWithCatch(() -> {
-            List<TeacherClassEntity> teacherClasses = teacherClassRepository.findClassesByTeacherId(teacherId);
-
+            List<TeacherClassEntity> teacherClasses = teacherClassRepository.findByTeacherId(teacherId);
             if (teacherClasses == null || teacherClasses.isEmpty()) {
                 return Map.of("items", List.of(), "totalPages", 0, "totalElements", 0);
             }
@@ -342,44 +350,277 @@ public class TeacherServiceImpl implements ITeacherService {
 
             List<ClassEntity> allClasses = classRepository.findAllByIds(classIds);
 
-            int totalElements = allClasses.size();
+            DateTimeFormatter displayFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+            // FE gửi lên định dạng yyyy-MM-dd
+            DateTimeFormatter parseFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+            LocalDateTime startFilter = (startDate != null && !startDate.isEmpty())
+                    ? LocalDate.parse(startDate, parseFormatter).atStartOfDay()
+                    : null;
+
+            LocalDateTime endFilter = (endDate != null && !endDate.isEmpty())
+                    ? LocalDate.parse(endDate, parseFormatter).atTime(23, 59, 59)
+                    : null;
+
+            List<TeacherClassResponse> classResponses = allClasses.stream()
+                    // Lọc theo trạng thái: nếu FE không truyền -> mặc định chỉ ACTIVE (giữ hành vi cũ)
+                    .filter(c -> (status != null && !status.isEmpty())
+                            ? status.equalsIgnoreCase(c.getStatus())
+                            : "ACTIVE".equalsIgnoreCase(c.getStatus()))
+                    // Lọc theo tên (chứa từ khóa, không phân biệt hoa thường)
+                    .filter(c -> {
+                        if (name != null && !name.isEmpty()) {
+                            return c.getClassName() != null
+                                    && c.getClassName().toLowerCase().contains(name.toLowerCase());
+                        }
+                        return true;
+                    })
+                    // Lọc theo chương trình học
+                    .filter(c -> {
+                        if (program != null && !program.isEmpty()) {
+                            return program.equals(c.getPrograme());
+                        }
+                        return true;
+                    })
+                    // Lọc theo ngày bắt đầu (lớp bắt đầu SAU hoặc BẰNG ngày filter)
+                    .filter(c -> {
+                        if (startFilter != null && c.getStartDateClass() != null) {
+                            return !c.getStartDateClass().isBefore(startFilter);
+                        }
+                        return true;
+                    })
+                    // Lọc theo ngày kết thúc (lớp kết thúc TRƯỚC hoặc BẰNG ngày filter)
+                    .filter(c -> {
+                        if (endFilter != null && c.getEndDateClass() != null) {
+                            return !c.getEndDateClass().isAfter(endFilter);
+                        }
+                        return true;
+                    })
+                    .map(c -> TeacherClassResponse.builder()
+                            .classId(c.getId())
+                            .className(c.getClassName())
+                            .program(c.getPrograme())
+                            .startDate(c.getStartDateClass() != null ? c.getStartDateClass().format(displayFormatter) : "")
+                            .endDate(c.getEndDateClass() != null ? c.getEndDateClass().format(displayFormatter) : "")
+                            .status(c.getStatus() != null ? c.getStatus() : "UNKNOWN")
+                            .build())
+                    .toList();
+
+            int totalElements = classResponses.size();
             int totalPages = Math.max(1, (int) Math.ceil((double) totalElements / size));
             int fromIndex = (page - 1) * size;
             int toIndex = Math.min(fromIndex + size, totalElements);
 
-            List<ClassEntity> paginatedClasses = (fromIndex < totalElements)
-                    ? allClasses.subList(fromIndex, toIndex)
+            List<TeacherClassResponse> paginatedClasses = (fromIndex < totalElements)
+                    ? classResponses.subList(fromIndex, toIndex)
                     : List.of();
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("items", paginatedClasses);
-            response.put("totalPages", totalPages);
-            response.put("totalElements", totalElements);
-
-            return response;
+            return Map.of(
+                    "items", paginatedClasses,
+                    "totalPages", totalPages,
+                    "totalElements", totalElements
+            );
         }, "Lỗi hệ thống khi lấy danh sách lớp học của giảng viên");
     }
 
     @Override
+    public Map<String, Object> getClassSessions(String classId, int page, int size) {
+        return executeWithCatch(() -> {
+            List<ClassSessionEntity> allSessions = classSessionRepository.findByClassId(classId);
+
+            DateTimeFormatter parseFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            DateTimeFormatter displayFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+            // Sắp xếp theo ngày tăng dần (buổi 1 -> buổi cuối)
+            List<ClassSessionEntity> sorted = allSessions.stream()
+                    .sorted((s1, s2) -> {
+                        try {
+                            return LocalDate.parse(s1.getSessionDate(), parseFormatter)
+                                    .compareTo(LocalDate.parse(s2.getSessionDate(), parseFormatter));
+                        } catch (Exception e) {
+                            return 0;
+                        }
+                    })
+                    .toList();
+
+            int totalElements = sorted.size();
+            int totalPages = Math.max(1, (int) Math.ceil((double) totalElements / size));
+            int fromIndex = (page - 1) * size;
+            int toIndex = Math.min(fromIndex + size, totalElements);
+
+            List<ClassSessionResponse> items = (fromIndex < totalElements)
+                    ? sorted.subList(fromIndex, toIndex).stream()
+                    .map(s -> ClassSessionResponse.builder()
+                            .id(s.getId())
+                            .title(s.getTitle())
+                            .sessionDate(formatSessionDate(s.getSessionDate(), parseFormatter, displayFormatter))
+                            .startTime(s.getStartTime())
+                            .endTime(s.getEndTime())
+                            .status(s.getStatus())
+                            .build())
+                    .toList()
+                    : List.of();
+
+            return Map.of(
+                    "items", items,
+                    "totalPages", totalPages,
+                    "totalElements", totalElements
+            );
+        }, "Lỗi hệ thống khi lấy lịch trình buổi học của lớp");
+    }
+
+    private String formatSessionDate(String raw, DateTimeFormatter parseFormatter, DateTimeFormatter displayFormatter) {
+        try {
+            return LocalDate.parse(raw, parseFormatter).format(displayFormatter);
+        } catch (Exception e) {
+            return raw;
+        }
+    }
+
+    @Override
+    public Map<String, Object> getSessionAttendance(String classId, String sessionId) {
+        return executeWithCatch(() -> {
+            List<StudentClassEntity> studentClasses = studentClassRepository.findByClassId(classId);
+            List<AttendanceEntity> attendanceRecords = attendanceRepository.findBySession(classId, sessionId);
+
+            Map<String, AttendanceEntity> attendanceMap = attendanceRecords.stream()
+                    .collect(Collectors.toMap(AttendanceEntity::getStudentId, a -> a));
+
+            List<AttendanceStudentResponse> items = new ArrayList<>();
+
+            for (StudentClassEntity sc : studentClasses) {
+                StudentEntity student = studentRepository.findById(sc.getStudentId());
+                if (student == null || Boolean.TRUE.equals(student.getDeleted())) continue;
+
+                ProfileEntity profile = profileRepository.findById(student.getProfileId());
+                if (profile == null) continue;
+
+                AccountEntity account = accountRepository.findEntityById(profile.getAccountId());
+
+                AttendanceEntity existing = attendanceMap.get(sc.getStudentId());
+
+                items.add(AttendanceStudentResponse.builder()
+                        .studentId(sc.getStudentId())
+                        .fullName(profile.getFullName())
+                        .phoneNumber(profile.getPhoneNumber())
+                        .email(account != null ? account.getEmail() : "")
+                        .status(existing != null ? existing.getStatus() : "Chưa điểm danh")
+                        .note(existing != null ? existing.getNote() : "")
+                        .build());
+            }
+
+            return Map.of("items", items, "totalElements", items.size());
+        }, "Lỗi hệ thống khi lấy danh sách điểm danh");
+    }
+
+    @Override
+    public String saveSessionAttendance(String classId, String sessionId, List<AttendanceRequest> records) {
+        String email = getCurrentUserEmail();
+        return executeWithCatch(() -> {
+            List<AttendanceEntity> entities = records.stream()
+                    .map(r -> AttendanceEntity.builder()
+                            .studentId(r.getStudentId())
+                            .status(r.getStatus())
+                            .note(r.getNote())
+                            .build())
+                    .toList();
+
+            attendanceRepository.saveAll(classId, sessionId, entities, email);
+
+            return "Lưu điểm danh thành công!";
+        }, "Lỗi hệ thống khi lưu điểm danh");
+    }
+
+    @Override
+    public List<TeacherScheduleResponse> getTeacherSchedules(String teacherId) {
+        return executeWithCatch(() -> {
+            List<TeacherClassEntity> teacherClasses = teacherClassRepository.findByTeacherId(teacherId);
+            if (teacherClasses == null || teacherClasses.isEmpty()) {
+                return List.of();
+            }
+
+            List<String> classIds = teacherClasses.stream()
+                    .map(TeacherClassEntity::getClassId)
+                    .toList();
+
+            List<ClassEntity> allClasses = classRepository.findAllByIds(classIds);
+            List<ClassEntity> activeClasses = allClasses.stream()
+                    .filter(c -> "ACTIVE".equalsIgnoreCase(c.getStatus()))
+                    .toList();
+
+            List<TeacherScheduleResponse> schedules = new ArrayList<>();
+
+            for (ClassEntity clazz : activeClasses) {
+                String displaySessionDate = formatScheduleDays(clazz.getScheduleDays());
+
+                schedules.add(TeacherScheduleResponse.builder()
+                        .id(clazz.getId())
+                        .classId(clazz.getId())
+                        .className(clazz.getClassName())
+                        .title(clazz.getDescription())
+                        .sessionDate(displaySessionDate)
+                        .startTime(clazz.getStartTime())
+                        .endTime(clazz.getEndTime())
+                        .location("Văn phòng CodeGym, Đà Nẵng")
+                        .build());
+            }
+            return schedules;
+        }, "Lỗi hệ thống khi lấy lịch dạy");
+    }
+    @Override
     public TeacherStatsResponse getTeacherStats(String teacherId) {
         return executeWithCatch(() -> {
-            List<TeacherClassEntity> teacherClasses = teacherClassRepository.findClassesByTeacherId(teacherId);
-            int totalClasses = (teacherClasses != null) ? teacherClasses.size() : 0;
+            List<TeacherClassEntity> teacherClasses = teacherClassRepository.findByTeacherId(teacherId);
+            if (teacherClasses == null || teacherClasses.isEmpty()) {
+                return TeacherStatsResponse.builder().totalClasses(0).totalStudents(0).build();
+            }
+
+            List<String> classIds = teacherClasses.stream()
+                    .map(TeacherClassEntity::getClassId)
+                    .toList();
+
+            List<ClassEntity> allClasses = classRepository.findAllByIds(classIds);
+
+            long activeClassesCount = allClasses.stream()
+                    .filter(c -> "ACTIVE".equalsIgnoreCase(c.getStatus()))
+                    .count();
 
             int totalStudents = 0;
 
             return TeacherStatsResponse.builder()
-                    .totalClasses(totalClasses)
+                    .totalClasses((int) activeClassesCount)
                     .totalStudents(totalStudents)
                     .build();
         }, "Lỗi hệ thống khi lấy thống kê giảng viên");
     }
 
-    @Override
-    public List<TeacherScheduleResponse> getTeacherSchedules(String teacherId) {
-        return List.of();
-    }
+    private String formatScheduleDays(List<Integer> scheduleDays) {
+        if (scheduleDays == null || scheduleDays.isEmpty()) {
+            return "Chưa có lịch";
+        }
 
+        Map<Integer, String> dayMap = Map.of(
+                0, "Chủ Nhật",
+                1, "Thứ 2",
+                2, "Thứ 3",
+                3, "Thứ 4",
+                4, "Thứ 5",
+                5, "Thứ 6",
+                6, "Thứ 7",
+                7, "Chủ Nhật"
+        );
+
+        List<String> formattedDays = new ArrayList<>();
+
+        for (Integer day : scheduleDays) {
+            if (dayMap.containsKey(day)) {
+                formattedDays.add(dayMap.get(day));
+            }
+        }
+
+        return String.join(", ", formattedDays);
+    }
 
     private <T> T executeWithCatch(Callable<T> task, String errorMessage) {
         try {

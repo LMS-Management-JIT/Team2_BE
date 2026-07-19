@@ -196,6 +196,20 @@ public class ClassRepository {
                 .get().get().getDocuments();
     }
 
+    public List<ClassEntity> findAllByIds(List<String> ids) throws ExecutionException, InterruptedException {
+        List<ClassEntity> result = new ArrayList<>();
+        if (ids == null || ids.isEmpty()) return result;
+
+        // Xử lý vòng lặp để lấy chi tiết từng class dựa trên ID
+        for (String id : ids) {
+            ClassEntity entity = findById(id);
+            if (entity != null && !entity.isDeleted()) {
+                result.add(entity);
+            }
+        }
+        return result;
+    }
+
     public long countActive() throws Exception {
         return getClassCollection()
                 .whereEqualTo("deleted", false)
