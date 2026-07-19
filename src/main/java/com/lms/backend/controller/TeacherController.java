@@ -2,6 +2,8 @@ package com.lms.backend.controller;
 
 import com.lms.backend.dto.request.TeacherRequest;
 import com.lms.backend.dto.response.TeacherResponse;
+import com.lms.backend.dto.response.TeacherScheduleResponse;
+import com.lms.backend.dto.response.TeacherStatsResponse;
 import com.lms.backend.service.ITeacherService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -77,6 +79,38 @@ public class TeacherController {
 
         return ResponseEntity.ok(
                 teacherService.deleteTeacher(id, deletedBy)
+        );
+    }
+
+    // LẤY TEACHER ID DỰA TRÊN ACCOUNT ID
+    @GetMapping("/account/{accountId}/id")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public ResponseEntity<java.util.Map<String, String>> getTeacherIdByAccountId(
+            @PathVariable String accountId) throws Exception {
+
+        String teacherId = teacherService.getTeacherIdByAccountId(accountId);
+        return ResponseEntity.ok(java.util.Collections.singletonMap("teacherId", teacherId));
+    }
+
+    // Lấy thống kê (tổng lớp, tổng học viên)
+    @GetMapping("/{id}/stats")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public ResponseEntity<TeacherStatsResponse> getTeacherStats(
+            @PathVariable String id) throws Exception {
+
+        return ResponseEntity.ok(
+                teacherService.getTeacherStats(id)
+        );
+    }
+
+    // Lấy danh sách lịch dạy (lấy từ subcollection class_sessions của các lớp)
+    @GetMapping("/{id}/schedules")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public ResponseEntity<List<TeacherScheduleResponse>> getTeacherSchedules(
+            @PathVariable String id) throws Exception {
+
+        return ResponseEntity.ok(
+                teacherService.getTeacherSchedules(id)
         );
     }
 }

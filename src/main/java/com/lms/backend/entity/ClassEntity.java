@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -38,6 +39,15 @@ public class ClassEntity {
 
     @PropertyName("update_by")
     private String updateBy;
+
+    @PropertyName("schedule_days")
+    private List<Integer> scheduleDays;
+
+    @PropertyName("start_time")
+    private String startTime;
+
+    @PropertyName("end_time")
+    private String endTime;
 
     @Exclude
     private LocalDateTime startDateClass;

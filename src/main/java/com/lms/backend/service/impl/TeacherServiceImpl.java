@@ -1,16 +1,15 @@
 package com.lms.backend.service.impl;
 
-import com.google.cloud.firestore.DocumentReference;
-import com.google.cloud.firestore.Firestore;
-import com.google.cloud.firestore.SetOptions;
+import com.google.cloud.firestore.*;
 import com.lms.backend.dto.request.TeacherRequest;
+import com.lms.backend.dto.response.ClassResponse;
 import com.lms.backend.dto.response.TeacherResponse;
-import com.lms.backend.entity.AccountEntity;
-import com.lms.backend.entity.ProfileEntity;
-import com.lms.backend.entity.RoleEntity;
-import com.lms.backend.entity.TeacherEntity;
+import com.lms.backend.dto.response.TeacherScheduleResponse;
+import com.lms.backend.dto.response.TeacherStatsResponse;
+import com.lms.backend.entity.*;
 import com.lms.backend.exception.BadRequestException;
 import com.lms.backend.exception.ResourceNotFoundException;
+import com.lms.backend.mapper.ClassMapper;
 import com.lms.backend.mapper.TeacherMapper;
 import com.lms.backend.repository.AccountRepository;
 import com.lms.backend.repository.ProfileRepository;
@@ -25,8 +24,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -40,7 +40,7 @@ public class TeacherServiceImpl implements ITeacherService {
     private final RoleRepository roleRepository;
 
     private final TeacherMapper teacherMapper;
-
+    private final ClassMapper classMapper;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -333,5 +333,141 @@ public class TeacherServiceImpl implements ITeacherService {
             }).get();
 
         }, "Lỗi hệ thống khi xóa giảng viên");
+    }
+
+    @Override
+    public String getTeacherIdByAccountId(String accountId) {
+        return executeWithCatch(() -> {
+            var profiles = firestore.collection("profiles")
+                    .whereEqualTo("account_id", accountId.trim()) // Thêm trim() giống file Student để an toàn
+                    .get().get().getDocuments();
+
+            if (profiles.isEmpty()) {
+                throw new ResourceNotFoundException("Không tìm thấy hồ sơ cho tài khoản này.");
+            }
+
+            var profileDoc = profiles.stream()
+                    .filter(doc -> !Boolean.TRUE.equals(doc.getBoolean("deleted")))
+                    .findFirst()
+                    .orElseThrow(() -> new ResourceNotFoundException("Hồ sơ đã bị xóa hoặc không tồn tại."));
+
+            String profileId = profileDoc.getId();
+
+            var teachers = firestore.collection("teachers")
+                    .whereEqualTo("profile_id", profileId)
+                    .get().get().getDocuments();
+
+            if (teachers.isEmpty()) {
+                throw new ResourceNotFoundException("Không tìm thấy thông tin giảng viên.");
+            }
+
+            var teacherDoc = teachers.stream()
+                    .filter(doc -> !Boolean.TRUE.equals(doc.getBoolean("deleted")))
+                    .findFirst()
+                    .orElseThrow(() -> new ResourceNotFoundException("Thông tin giảng viên đã bị xóa hoặc không tồn tại."));
+
+            return teacherDoc.getId();
+        }, "Lỗi hệ thống khi tra cứu Teacher ID");
+    }
+
+    @Override
+    public TeacherStatsResponse getTeacherStats(String teacherId) throws Exception {
+        return executeWithCatch(() -> {
+
+            checkTeacherExists(teacherId);
+
+            Map<String, String> classMap = teacherRepository.getClassMapByTeacherId(teacherId);
+            int totalClasses = classMap.size();
+
+            int totalStudents = teacherRepository.countUniqueStudentsByClassIds(classMap.keySet());
+
+            return TeacherStatsResponse.builder()
+                    .totalClasses(totalClasses)
+                    .totalStudents(totalStudents)
+                    .build();
+
+        }, "Lỗi hệ thống khi lấy thống kê của giảng viên");
+    }
+
+    @Override
+    public List<TeacherScheduleResponse> getTeacherSchedules(String teacherId) {
+        try {
+            List<TeacherScheduleResponse> schedules = new ArrayList<>();
+
+            List<QueryDocumentSnapshot> relations = teacherRepository.findClassesByTeacherId(teacherId);
+
+            for (QueryDocumentSnapshot rel : relations) {
+                String classId = rel.getString("class_id");
+                if (classId == null) continue;
+
+                DocumentSnapshot classDoc = teacherRepository.getClassDoc(classId);
+
+                if (classDoc.exists() && Boolean.FALSE.equals(classDoc.getBoolean("deleted"))) {
+                    TeacherScheduleResponse schedule = new TeacherScheduleResponse();
+
+                    schedule.setId(classDoc.getId());
+                    schedule.setClassName(classDoc.getString("class_name"));
+                    schedule.setTitle(classDoc.getString("description"));
+                    schedule.setStartTime(classDoc.getString("start_time"));
+                    schedule.setEndTime(classDoc.getString("end_time"));
+
+                    List<Long> scheduleDays = (List<Long>) classDoc.get("schedule_days");
+                    schedule.setSessionDate(formatScheduleDays(scheduleDays));
+
+                    schedule.setLocation("Văn phòng Code Gym, Đà Nẵng");
+
+                    schedules.add(schedule);
+                }
+            }
+            return schedules;
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi khi lấy lịch giảng dạy chung: " + e.getMessage());
+        }
+    }
+
+    private String formatScheduleDays(List<Long> days) {
+        if (days == null || days.isEmpty()) return "Chưa xếp lịch";
+
+        List<String> dayNames = new ArrayList<>();
+        for (Long day : days) {
+            if (day == 7) {
+                dayNames.add("Chủ Nhật");
+            } else {
+                long realDay = day + 1;
+                dayNames.add("Thứ " + realDay);
+            }
+        }
+        return String.join(", ", dayNames);
+    }
+    @Override
+    public Map<String, Object> getClassesByTeacher(String teacherId, int page, int size) {
+        return executeWithCatch(() -> {
+            // 1. Gọi Repo lấy dữ liệu thô (DocumentSnapshot)
+            List<DocumentSnapshot> docs = teacherRepository.getDetailedClassDocsByTeacherId(teacherId);
+
+            // 2. Mapper thực hiện công việc chuyển đổi ở tầng Service
+            List<ClassEntity> allClasses = docs.stream()
+                    .map(doc -> classMapper.fromDocument(doc)) // Sử dụng mapper ở đây
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+            int totalElements = allClasses.size();
+            int totalPages = Math.max(1, (int) Math.ceil((double) totalElements / size));
+            int fromIndex = (page - 1) * size;
+            int toIndex = Math.min(fromIndex + size, totalElements);
+
+            List<ClassEntity> paginatedList = (fromIndex < totalElements)
+                    ? allClasses.subList(fromIndex, toIndex)
+                    : new ArrayList<>();
+
+            // 3. Chuyển sang DTO Response bằng Mapper
+            List<ClassResponse> items = paginatedList.stream()
+                    .map(classMapper::toResponse)
+                    .collect(Collectors.toList());
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("items", items);
+            response.put("totalPages", totalPages);
+            return response;
+        }, "Lỗi hệ thống khi lấy danh sách lớp học của giảng viên");
     }
 }
