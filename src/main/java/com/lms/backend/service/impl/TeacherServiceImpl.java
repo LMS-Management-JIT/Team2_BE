@@ -1,20 +1,19 @@
 package com.lms.backend.service.impl;
 
-import com.google.cloud.firestore.*;
+import com.google.cloud.firestore.DocumentReference;
+import com.google.cloud.firestore.Firestore;
+import com.google.cloud.firestore.SetOptions;
+import com.lms.backend.dto.request.HistoryRequest;
+import com.lms.backend.dto.request.TeacherClassRequest;
 import com.lms.backend.dto.request.TeacherRequest;
-import com.lms.backend.dto.response.ClassResponse;
-import com.lms.backend.dto.response.TeacherResponse;
-import com.lms.backend.dto.response.TeacherScheduleResponse;
-import com.lms.backend.dto.response.TeacherStatsResponse;
+import com.lms.backend.dto.response.*;
 import com.lms.backend.entity.*;
 import com.lms.backend.exception.BadRequestException;
 import com.lms.backend.exception.ResourceNotFoundException;
-import com.lms.backend.mapper.ClassMapper;
+import com.lms.backend.mapper.TeacherClassMapper;
 import com.lms.backend.mapper.TeacherMapper;
-import com.lms.backend.repository.AccountRepository;
-import com.lms.backend.repository.ProfileRepository;
-import com.lms.backend.repository.RoleRepository;
-import com.lms.backend.repository.TeacherRepository;
+import com.lms.backend.repository.*;
+import com.lms.backend.service.IHistoryService;
 import com.lms.backend.service.ITeacherService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -24,29 +23,363 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.Callable;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import static com.lms.backend.utils.HistoryChangeUtils.changed;
 
 @Service
 @RequiredArgsConstructor
 public class TeacherServiceImpl implements ITeacherService {
 
     private final Firestore firestore;
-
     private final TeacherRepository teacherRepository;
     private final ProfileRepository profileRepository;
     private final AccountRepository accountRepository;
     private final RoleRepository roleRepository;
+    private final ClassRepository classRepository;
+    private final TeacherClassRepository teacherClassRepository;
 
     private final TeacherMapper teacherMapper;
-    private final ClassMapper classMapper;
+    private final TeacherClassMapper teacherClassMapper;
+
     private final PasswordEncoder passwordEncoder;
+    private final IHistoryService historyService;
+
+    // ==========================================
+    // OVERRIDE METHODS
+    // ==========================================
 
     @Override
     public long countTeachers() throws Exception {
         return teacherRepository.countActive();
     }
+
+    @Override
+    public String createTeacher(TeacherRequest request) {
+        validateCreateTeacher(request);
+        String email = getCurrentUserEmail();
+        request.setRequestedBy(email);
+
+        String newId = executeWithCatch(() -> {
+            AccountEntity account = teacherMapper.toAccountEntity(request);
+            RoleEntity teacherRole = roleRepository.findByName("TEACHER");
+            if (teacherRole == null) {
+                throw new ResourceNotFoundException("Không tìm thấy role TEACHER.");
+            }
+            account.setRoleId(teacherRole.getId());
+            account.setPassword(passwordEncoder.encode("123456"));
+
+            ProfileEntity profile = teacherMapper.toProfileEntity(request);
+            TeacherEntity teacher = teacherMapper.toTeacherEntity(request);
+
+            account.setCreatedBy(email);
+            account.setUpdateBy(email);
+            profile.setCreatedBy(email);
+            profile.setUpdatedBy(email);
+            teacher.setCreatedBy(email);
+            teacher.setUpdatedBy(email);
+
+            return firestore.runTransaction(transaction -> {
+                // Account
+                DocumentReference accountRef = accountRepository.getAccountCollection().document();
+                account.setId(accountRef.getId());
+                transaction.set(accountRef, teacherMapper.accountToFirestoreMap(account));
+
+                // Profile
+                DocumentReference profileRef = profileRepository.getProfileCollection().document();
+                profile.setId(profileRef.getId());
+                profile.setAccountId(account.getId());
+                transaction.set(profileRef, teacherMapper.profileToFirestoreMap(profile));
+
+                // Teacher
+                DocumentReference teacherRef = teacherRepository.getTeacherCollection().document();
+                teacher.setId(teacherRef.getId());
+                teacher.setProfileId(profile.getId());
+                transaction.set(teacherRef, teacherMapper.teacherToFirestoreMap(teacher));
+
+                // Teacher Classes
+                if (request.getClasses() != null) {
+                    for (TeacherClassRequest item : request.getClasses()) {
+                        TeacherClassEntity tc = teacherClassMapper.toEntity(item.getClassId());
+                        tc.setTeacherId(teacher.getId());
+                        tc.setDeleted(false);
+                        tc.setCreatedBy(email);
+                        tc.setUpdatedBy(email);
+                        tc.setCreateDate(LocalDateTime.now());
+                        tc.setUpdateDate(LocalDateTime.now());
+
+                        DocumentReference tcRef = teacherClassRepository.getTeacherClassCollection().document();
+                        tc.setId(tcRef.getId());
+                        transaction.set(tcRef, teacherClassMapper.toFirestoreMap(tc));
+                    }
+                }
+
+                return teacher.getId();
+            }).get();
+        }, "Lỗi hệ thống khi tạo giảng viên");
+
+        historyService.record(HistoryRequest.builder()
+                .action(ActionType.ADD)
+                .actorId(email)
+                .actorName(email)
+                .entityType(EntityType.TEACHER.name())
+                .entityId(newId)
+                .entityName(request.getFullName())
+                .changes(Map.of())
+                .build());
+
+        return newId;
+    }
+
+    @Override
+    public String updateTeacher(String id, TeacherRequest request) {
+        String email = getCurrentUserEmail();
+        TeacherEntity teacher = checkTeacherExists(id);
+        ProfileEntity profile = checkProfileExists(teacher.getProfileId());
+        AccountEntity account = checkAccountExists(profile.getAccountId());
+
+        validateUpdateTeacher(request, account, profile);
+
+        Map<String, HistoryEntity.ChangeDetail> changes = buildUpdateChanges(teacher, profile, account, request);
+
+        String result = executeWithCatch(() -> {
+            teacherMapper.updateAccount(account, request);
+            teacherMapper.updateProfile(profile, request);
+            teacherMapper.updateTeacher(teacher, request);
+
+            LocalDateTime now = LocalDateTime.now();
+            account.setUpdateBy(email);
+            account.setUpdateDate(now);
+            profile.setUpdatedBy(email);
+            profile.setUpdateDate(now);
+            teacher.setUpdatedBy(email);
+            teacher.setUpdateDate(now);
+
+            firestore.runTransaction(transaction -> {
+                transaction.set(accountRepository.getAccountCollection().document(account.getId()), teacherMapper.accountToFirestoreMap(account), SetOptions.merge());
+                transaction.set(profileRepository.getProfileCollection().document(profile.getId()), teacherMapper.profileToFirestoreMap(profile), SetOptions.merge());
+                transaction.set(teacherRepository.getTeacherCollection().document(teacher.getId()), teacherMapper.teacherToFirestoreMap(teacher), SetOptions.merge());
+                return null;
+            }).get();
+
+            // Sync classes
+            teacherClassRepository.syncTeacherClasses(teacher.getId(), request.getClasses(), email);
+
+            return "Cập nhật giảng viên thành công!";
+        }, "Lỗi hệ thống khi cập nhật giảng viên");
+
+        historyService.record(HistoryRequest.builder()
+                .action(ActionType.UPDATE)
+                .actorId(email)
+                .actorName(email)
+                .entityType(EntityType.TEACHER.name())
+                .entityId(teacher.getId())
+                .entityName(profile.getFullName())
+                .changes(changes)
+                .build());
+
+        return result;
+    }
+
+    @Override
+    public String deleteTeacher(String id, String deletedBy) throws Exception {
+        return "";
+    }
+
+    @Override
+    public String deleteTeacher(String id) {
+        String email = getCurrentUserEmail();
+        TeacherEntity teacher = checkTeacherExists(id);
+        ProfileEntity profile = checkProfileExists(teacher.getProfileId());
+        AccountEntity account = checkAccountExists(profile.getAccountId());
+
+        String result = executeWithCatch(() -> {
+            account.setDeleted(true);
+            profile.setDeleted(true);
+            teacher.setDeleted(true);
+
+            LocalDateTime now = LocalDateTime.now();
+            account.setUpdateBy(email);
+            account.setUpdateDate(now);
+            profile.setUpdatedBy(email);
+            profile.setUpdateDate(now);
+            teacher.setUpdatedBy(email);
+            teacher.setUpdateDate(now);
+
+            firestore.runTransaction(transaction -> {
+                transaction.set(accountRepository.getAccountCollection().document(account.getId()), teacherMapper.accountToFirestoreMap(account), SetOptions.merge());
+                transaction.set(profileRepository.getProfileCollection().document(profile.getId()), teacherMapper.profileToFirestoreMap(profile), SetOptions.merge());
+                transaction.set(teacherRepository.getTeacherCollection().document(teacher.getId()), teacherMapper.teacherToFirestoreMap(teacher), SetOptions.merge());
+                return null;
+            }).get();
+
+            teacherClassRepository.softDeleteByTeacherId(teacher.getId(), email);
+
+            return "Xóa giảng viên thành công!";
+        }, "Lỗi hệ thống khi xóa giảng viên");
+
+        historyService.record(HistoryRequest.builder()
+                .action(ActionType.DELETE)
+                .actorId(email)
+                .actorName(email)
+                .entityType(EntityType.TEACHER.name())
+                .entityId(teacher.getId())
+                .entityName(profile.getFullName())
+                .changes(Map.of("deleted", changed(false, true)))
+                .build());
+
+        return result;
+    }
+
+    @Override
+    public TeacherResponse getTeacherDetail(String id) {
+        return executeWithCatch(() -> {
+            TeacherEntity teacher = checkTeacherExists(id);
+            ProfileEntity profile = checkProfileExists(teacher.getProfileId());
+            AccountEntity account = checkAccountExists(profile.getAccountId());
+
+            TeacherResponse response = teacherMapper.toResponse(account, profile, teacher);
+            response.setClasses(teacherClassRepository.findClassesByTeacherId(teacher.getId()));
+
+            return response;
+        }, "Lỗi hệ thống khi lấy chi tiết giảng viên");
+    }
+
+    @Override
+    public Map<String, Object> getAllTeachers(int page, int size, String keyword, String classId, Boolean available) {
+        return executeWithCatch(() -> {
+            // Load all data once
+            List<TeacherEntity> allTeachers = teacherRepository.findAllActive();
+            List<ProfileEntity> profiles = profileRepository.findAllActive();
+            List<AccountEntity> accounts = accountRepository.findAllActiveEntities();
+            List<TeacherClassEntity> teacherClasses = teacherClassRepository.findAllActive();
+            List<ClassEntity> classes = classRepository.findAllActive();
+
+            // Lookup maps
+            Map<String, ProfileEntity> profileMap = profiles.stream()
+                    .collect(Collectors.toMap(ProfileEntity::getId, Function.identity()));
+            Map<String, AccountEntity> accountMap = accounts.stream()
+                    .collect(Collectors.toMap(AccountEntity::getId, Function.identity()));
+            Map<String, ClassEntity> classMap = classes.stream()
+                    .collect(Collectors.toMap(ClassEntity::getId, Function.identity()));
+            Map<String, List<TeacherClassEntity>> teacherClassMap = teacherClasses.stream()
+                    .collect(Collectors.groupingBy(TeacherClassEntity::getTeacherId));
+
+            String search = keyword == null ? "" : keyword.trim().toLowerCase();
+
+            List<TeacherEntity> filteredList = allTeachers.stream()
+                    .filter(t -> t.getProfileId() != null)
+                    .filter(t -> search.isBlank() || matchesSearch(t, profileMap, accountMap, search))
+                    .filter(t -> available == null || available.equals(t.getAvailable()))
+                    .filter(t -> classId == null || classId.isBlank() || matchesClass(t, teacherClassMap, classId))
+                    .sorted((t1, t2) -> t2.getCreateDate().compareTo(t1.getCreateDate()))
+                    .toList();
+
+            // Phân trang
+            int totalElements = filteredList.size();
+            int totalPages = Math.max(1, (int) Math.ceil((double) totalElements / size));
+            int fromIndex = (page - 1) * size;
+            int toIndex = Math.min(fromIndex + size, totalElements);
+
+            List<TeacherListResponse> items = (fromIndex < totalElements)
+                    ? buildTeacherListResponses(filteredList.subList(fromIndex, toIndex), profileMap, accountMap, teacherClassMap, classMap)
+                    : List.of();
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("items", items);
+            response.put("totalPages", totalPages);
+            response.put("totalElements", totalElements);
+
+            return response;
+        }, "Lỗi hệ thống khi lấy danh sách giảng viên");
+    }
+
+    @Override
+    public List<TeacherResponse> getAllTeachers() throws Exception {
+        return List.of();
+    }
+
+    @Override
+    public String getTeacherIdByAccountId(String accountId) {
+        return executeWithCatch(() -> {
+            ProfileEntity profile = profileRepository.findByAccountId(accountId);
+            if (profile == null || Boolean.TRUE.equals(profile.getDeleted())) {
+                throw new ResourceNotFoundException("Không tìm thấy hồ sơ cho tài khoản này.");
+            }
+
+            TeacherEntity teacher = teacherRepository.findByProfileId(profile.getId());
+            if (teacher == null || Boolean.TRUE.equals(teacher.getDeleted())) {
+                throw new ResourceNotFoundException("Tài khoản này không phải là giảng viên.");
+            }
+
+            return teacher.getId();
+        }, "Lỗi hệ thống khi lấy Teacher ID từ Account ID");
+    }
+
+    @Override
+    public Map<String, Object> getClassesByTeacher(String teacherId, int page, int size) {
+        return executeWithCatch(() -> {
+            List<TeacherClassEntity> teacherClasses = teacherClassRepository.findClassesByTeacherId(teacherId);
+
+            if (teacherClasses == null || teacherClasses.isEmpty()) {
+                return Map.of("items", List.of(), "totalPages", 0, "totalElements", 0);
+            }
+
+            List<String> classIds = teacherClasses.stream()
+                    .filter(tc -> !Boolean.TRUE.equals(tc.getDeleted()))
+                    .map(TeacherClassEntity::getClassId)
+                    .toList();
+
+            if (classIds.isEmpty()) {
+                return Map.of("items", List.of(), "totalPages", 0, "totalElements", 0);
+            }
+
+            List<ClassEntity> allClasses = classRepository.findAllByIds(classIds);
+
+            int totalElements = allClasses.size();
+            int totalPages = Math.max(1, (int) Math.ceil((double) totalElements / size));
+            int fromIndex = (page - 1) * size;
+            int toIndex = Math.min(fromIndex + size, totalElements);
+
+            List<ClassEntity> paginatedClasses = (fromIndex < totalElements)
+                    ? allClasses.subList(fromIndex, toIndex)
+                    : List.of();
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("items", paginatedClasses);
+            response.put("totalPages", totalPages);
+            response.put("totalElements", totalElements);
+
+            return response;
+        }, "Lỗi hệ thống khi lấy danh sách lớp học của giảng viên");
+    }
+
+    @Override
+    public TeacherStatsResponse getTeacherStats(String teacherId) {
+        return executeWithCatch(() -> {
+            List<TeacherClassEntity> teacherClasses = teacherClassRepository.findClassesByTeacherId(teacherId);
+            int totalClasses = (teacherClasses != null) ? teacherClasses.size() : 0;
+
+            int totalStudents = 0;
+
+            return TeacherStatsResponse.builder()
+                    .totalClasses(totalClasses)
+                    .totalStudents(totalStudents)
+                    .build();
+        }, "Lỗi hệ thống khi lấy thống kê giảng viên");
+    }
+
+    @Override
+    public List<TeacherScheduleResponse> getTeacherSchedules(String teacherId) {
+        return List.of();
+    }
+
 
     private <T> T executeWithCatch(Callable<T> task, String errorMessage) {
         try {
@@ -58,416 +391,148 @@ public class TeacherServiceImpl implements ITeacherService {
         }
     }
 
+    private String getCurrentUserEmail() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new IllegalStateException("Authentication required");
+        }
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof UserDetails userDetails) {
+            return userDetails.getUsername();
+        }
+        if (principal instanceof String principalName && !"anonymousUser".equals(principalName)) {
+            return principalName;
+        }
+        throw new IllegalStateException("Authentication required");
+    }
+
     private TeacherEntity checkTeacherExists(String id) {
-
         return executeWithCatch(() -> {
-
             TeacherEntity teacher = teacherRepository.findById(id);
-
             if (teacher == null || Boolean.TRUE.equals(teacher.getDeleted())) {
                 throw new ResourceNotFoundException("Không tìm thấy giảng viên.");
             }
-
             return teacher;
-
         }, "Lỗi hệ thống khi lấy thông tin giảng viên");
     }
 
     private ProfileEntity checkProfileExists(String profileId) {
-
         return executeWithCatch(() -> {
-
             ProfileEntity profile = profileRepository.findById(profileId);
-
             if (profile == null || Boolean.TRUE.equals(profile.getDeleted())) {
                 throw new ResourceNotFoundException("Không tìm thấy hồ sơ.");
             }
-
             return profile;
-
         }, "Lỗi hệ thống khi lấy thông tin hồ sơ");
     }
 
     private AccountEntity checkAccountExists(String accountId) {
-
         return executeWithCatch(() -> {
-
             AccountEntity account = accountRepository.findEntityById(accountId);
-
             if (account == null || Boolean.TRUE.equals(account.getDeleted())) {
                 throw new ResourceNotFoundException("Không tìm thấy tài khoản.");
             }
-
             return account;
-
         }, "Lỗi hệ thống khi lấy thông tin tài khoản");
     }
 
-    private String getCurrentUserEmail() {
-
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new IllegalStateException("Authentication required");
+    private void validateCreateTeacher(TeacherRequest request) {
+        try {
+            if (accountRepository.existsByEmail(request.getEmail())) {
+                throw new BadRequestException("Email đã tồn tại.");
+            }
+            if (profileRepository.existsByPhoneNumber(request.getPhoneNumber())) {
+                throw new BadRequestException("Số điện thoại đã tồn tại.");
+            }
+        } catch (Exception e) {
+            if (e instanceof BadRequestException) throw (BadRequestException) e;
+            throw new RuntimeException(e);
         }
-
-        Object principal = authentication.getPrincipal();
-
-        if (principal instanceof UserDetails userDetails) {
-            return userDetails.getUsername();
-        }
-
-        if (principal instanceof String principalName && !"anonymousUser".equals(principalName)) {
-            return principalName;
-        }
-
-        throw new IllegalStateException("Authentication required");
-    }
-
-    private void validateTeacher(TeacherRequest request) {
 
         if (request.getDayOfBirth() != null && request.getDayOfBirth().isAfter(LocalDateTime.now())) {
-
             throw new BadRequestException("Ngày sinh không được lớn hơn thời điểm hiện tại.");
         }
+    }
 
-        if (request.getAvailable() == null) {
-            throw new BadRequestException("Trạng thái sẵn sàng không được để trống.");
+    private void validateUpdateTeacher(TeacherRequest request, AccountEntity account, ProfileEntity profile) {
+        try {
+            if (accountRepository.existsByEmailExceptId(request.getEmail(), account.getId())) {
+                throw new BadRequestException("Email đã tồn tại.");
+            }
+            if (profileRepository.existsByPhoneNumberExceptId(request.getPhoneNumber(), profile.getId())) {
+                throw new BadRequestException("Số điện thoại đã tồn tại.");
+            }
+        } catch (Exception e) {
+            if (e instanceof BadRequestException) throw (BadRequestException) e;
+            throw new RuntimeException(e);
         }
     }
 
-    @Override
-    public String createTeacher(TeacherRequest request) {
+    private boolean matchesSearch(TeacherEntity teacher, Map<String, ProfileEntity> profileMap, Map<String, AccountEntity> accountMap, String search) {
+        ProfileEntity profile = profileMap.get(teacher.getProfileId());
+        if (profile == null) return false;
 
-        validateTeacher(request);
+        AccountEntity account = accountMap.get(profile.getAccountId());
+        if (account == null) return false;
 
-        String email = getCurrentUserEmail();
-
-        return executeWithCatch(() -> {
-
-            AccountEntity account = teacherMapper.toAccountEntity(request);
-
-            RoleEntity teacherRole = roleRepository.findByName("TEACHER");
-
-            if (teacherRole == null) {
-                throw new ResourceNotFoundException("Không tìm thấy role TEACHER.");
-            }
-
-            account.setRoleId(teacherRole.getId());
-            account.setPassword(passwordEncoder.encode("123456"));
-
-            ProfileEntity profile = teacherMapper.toProfileEntity(request);
-
-            TeacherEntity teacher = teacherMapper.toTeacherEntity(request);
-
-            account.setCreatedBy(email);
-            account.setUpdateBy(email);
-
-            profile.setCreatedBy(email);
-            profile.setUpdatedBy(email);
-
-            teacher.setCreatedBy(email);
-            teacher.setUpdatedBy(email);
-
-            return firestore.runTransaction(transaction -> {
-
-                // Account
-                DocumentReference accountRef = accountRepository.getAccountCollection().document();
-
-                account.setId(accountRef.getId());
-
-                transaction.set(accountRef, teacherMapper.accountToFirestoreMap(account));
-
-                // Profile
-                DocumentReference profileRef = profileRepository.getProfileCollection().document();
-
-                profile.setId(profileRef.getId());
-                profile.setAccountId(account.getId());
-
-                transaction.set(profileRef, teacherMapper.profileToFirestoreMap(profile));
-
-                // Teacher
-                DocumentReference teacherRef = teacherRepository.getTeacherCollection().document();
-
-                teacher.setId(teacherRef.getId());
-                teacher.setProfileId(profile.getId());
-
-                transaction.set(teacherRef, teacherMapper.teacherToFirestoreMap(teacher));
-
-                return teacher.getId();
-
-            }).get();
-
-        }, "Lỗi hệ thống khi tạo giảng viên");
+        return account.getEmail().toLowerCase().contains(search) ||
+                profile.getFullName().toLowerCase().contains(search) ||
+                (profile.getPhoneNumber() != null && profile.getPhoneNumber().contains(search));
     }
 
-    @Override
-    public List<TeacherResponse> getAllTeachers() {
-
-        return executeWithCatch(() -> {
-
-            List<TeacherEntity> teachers = teacherRepository.findAllActive();
-
-            return teachers.stream()
-
-                    .filter(teacher -> teacher.getProfileId() != null)
-
-                    .map(teacher -> {
-
-                        ProfileEntity profile = checkProfileExists(teacher.getProfileId());
-
-                        AccountEntity account = checkAccountExists(profile.getAccountId());
-
-                        TeacherResponse response = teacherMapper.toResponse(account, profile, teacher);
-
-//                        response.setClassNames(teacherRepository.getClassNamesByTeacherId(teacher.getId()));
-
-                        return response;
-
-                    }).toList();
-
-        }, "Lỗi hệ thống khi lấy danh sách giảng viên");
+    private boolean matchesClass(TeacherEntity teacher, Map<String, List<TeacherClassEntity>> teacherClassMap, String classId) {
+        return teacherClassMap.getOrDefault(teacher.getId(), List.of()).stream()
+                .anyMatch(tc -> classId.equals(tc.getClassId()));
     }
 
-    @Override
-    public TeacherResponse getTeacherDetail(String id) {
+    private List<TeacherListResponse> buildTeacherListResponses(
+            List<TeacherEntity> teachers,
+            Map<String, ProfileEntity> profileMap,
+            Map<String, AccountEntity> accountMap,
+            Map<String, List<TeacherClassEntity>> teacherClassMap,
+            Map<String, ClassEntity> classMap) {
 
-        return executeWithCatch(() -> {
+        return teachers.stream().map(teacher -> {
+            ProfileEntity profile = profileMap.get(teacher.getProfileId());
+            if (profile == null) return null;
 
-            TeacherEntity teacher = checkTeacherExists(id);
+            AccountEntity account = accountMap.get(profile.getAccountId());
+            if (account == null) return null;
 
-            ProfileEntity profile = checkProfileExists(teacher.getProfileId());
-
-            AccountEntity account = checkAccountExists(profile.getAccountId());
-
-            TeacherResponse response = teacherMapper.toResponse(account, profile, teacher);
-
-            response.setClassNames(teacherRepository.getClassNamesByTeacherId(teacher.getId()));
-
-            return response;
-
-        }, "Lỗi hệ thống khi lấy thông tin giảng viên");
-    }
-
-    @Override
-    public String updateTeacher(String id, TeacherRequest request) {
-
-        validateTeacher(request);
-
-        String email = getCurrentUserEmail();
-
-        return executeWithCatch(() -> {
-
-            TeacherEntity teacher = checkTeacherExists(id);
-
-            ProfileEntity profile = checkProfileExists(teacher.getProfileId());
-
-            AccountEntity account = checkAccountExists(profile.getAccountId());
-
-            teacherMapper.updateAccount(account, request);
-            teacherMapper.updateProfile(profile, request);
-            teacherMapper.updateTeacher(teacher, request);
-
-            LocalDateTime now = LocalDateTime.now();
-
-            account.setUpdateBy(email);
-            account.setUpdateDate(now);
-
-            profile.setUpdatedBy(email);
-            profile.setUpdateDate(now);
-
-            teacher.setUpdatedBy(email);
-            teacher.setUpdateDate(now);
-
-            return firestore.runTransaction(transaction -> {
-
-                transaction.set(accountRepository.getAccountCollection().document(account.getId()), teacherMapper.accountToFirestoreMap(account), SetOptions.merge());
-
-                transaction.set(profileRepository.getProfileCollection().document(profile.getId()), teacherMapper.profileToFirestoreMap(profile), SetOptions.merge());
-
-                transaction.set(teacherRepository.getTeacherCollection().document(teacher.getId()), teacherMapper.teacherToFirestoreMap(teacher), SetOptions.merge());
-
-                return "Cập nhật giảng viên thành công!";
-
-            }).get();
-
-        }, "Lỗi hệ thống khi cập nhật giảng viên");
-    }
-
-    @Override
-    public String deleteTeacher(String id, String deletedBy) {
-
-        return executeWithCatch(() -> {
-
-            TeacherEntity teacher = checkTeacherExists(id);
-
-            ProfileEntity profile = checkProfileExists(teacher.getProfileId());
-
-            AccountEntity account = checkAccountExists(profile.getAccountId());
-
-            account.setDeleted(true);
-            profile.setDeleted(true);
-            teacher.setDeleted(true);
-
-            LocalDateTime now = LocalDateTime.now();
-
-            account.setUpdateBy(deletedBy);
-            account.setUpdateDate(now);
-
-            profile.setUpdatedBy(deletedBy);
-            profile.setUpdateDate(now);
-
-            teacher.setUpdatedBy(deletedBy);
-            teacher.setUpdateDate(now);
-
-            return firestore.runTransaction(transaction -> {
-
-                transaction.set(accountRepository.getAccountCollection().document(account.getId()), teacherMapper.accountToFirestoreMap(account), SetOptions.merge());
-
-                transaction.set(profileRepository.getProfileCollection().document(profile.getId()), teacherMapper.profileToFirestoreMap(profile), SetOptions.merge());
-
-                transaction.set(teacherRepository.getTeacherCollection().document(teacher.getId()), teacherMapper.teacherToFirestoreMap(teacher), SetOptions.merge());
-
-                return "Xóa giảng viên thành công!";
-
-            }).get();
-
-        }, "Lỗi hệ thống khi xóa giảng viên");
-    }
-
-    @Override
-    public String getTeacherIdByAccountId(String accountId) {
-        return executeWithCatch(() -> {
-            var profiles = firestore.collection("profiles")
-                    .whereEqualTo("account_id", accountId.trim()) // Thêm trim() giống file Student để an toàn
-                    .get().get().getDocuments();
-
-            if (profiles.isEmpty()) {
-                throw new ResourceNotFoundException("Không tìm thấy hồ sơ cho tài khoản này.");
-            }
-
-            var profileDoc = profiles.stream()
-                    .filter(doc -> !Boolean.TRUE.equals(doc.getBoolean("deleted")))
-                    .findFirst()
-                    .orElseThrow(() -> new ResourceNotFoundException("Hồ sơ đã bị xóa hoặc không tồn tại."));
-
-            String profileId = profileDoc.getId();
-
-            var teachers = firestore.collection("teachers")
-                    .whereEqualTo("profile_id", profileId)
-                    .get().get().getDocuments();
-
-            if (teachers.isEmpty()) {
-                throw new ResourceNotFoundException("Không tìm thấy thông tin giảng viên.");
-            }
-
-            var teacherDoc = teachers.stream()
-                    .filter(doc -> !Boolean.TRUE.equals(doc.getBoolean("deleted")))
-                    .findFirst()
-                    .orElseThrow(() -> new ResourceNotFoundException("Thông tin giảng viên đã bị xóa hoặc không tồn tại."));
-
-            return teacherDoc.getId();
-        }, "Lỗi hệ thống khi tra cứu Teacher ID");
-    }
-
-    @Override
-    public TeacherStatsResponse getTeacherStats(String teacherId) throws Exception {
-        return executeWithCatch(() -> {
-
-            checkTeacherExists(teacherId);
-
-            Map<String, String> classMap = teacherRepository.getClassMapByTeacherId(teacherId);
-            int totalClasses = classMap.size();
-
-            int totalStudents = teacherRepository.countUniqueStudentsByClassIds(classMap.keySet());
-
-            return TeacherStatsResponse.builder()
-                    .totalClasses(totalClasses)
-                    .totalStudents(totalStudents)
+            TeacherListResponse response = TeacherListResponse.builder()
+                    .id(teacher.getId())
+                    .fullName(profile.getFullName())
+                    .email(account.getEmail())
+                    .phoneNumber(profile.getPhoneNumber())
+                    .gender(profile.getGender())
+                    .available(teacher.getAvailable())
                     .build();
 
-        }, "Lỗi hệ thống khi lấy thống kê của giảng viên");
-    }
+            List<TeacherClassResponse> classResponses = teacherClassMap.getOrDefault(teacher.getId(), List.of()).stream()
+                    .map(tc -> {
+                        ClassEntity clazz = classMap.get(tc.getClassId());
+                        return TeacherClassResponse.builder()
+                                .classId(tc.getClassId())
+                                .className(clazz != null ? clazz.getClassName() : "")
+                                .build();
+                    }).toList();
 
-    @Override
-    public List<TeacherScheduleResponse> getTeacherSchedules(String teacherId) {
-        try {
-            List<TeacherScheduleResponse> schedules = new ArrayList<>();
-
-            List<QueryDocumentSnapshot> relations = teacherRepository.findClassesByTeacherId(teacherId);
-
-            for (QueryDocumentSnapshot rel : relations) {
-                String classId = rel.getString("class_id");
-                if (classId == null) continue;
-
-                DocumentSnapshot classDoc = teacherRepository.getClassDoc(classId);
-
-                if (classDoc.exists() && Boolean.FALSE.equals(classDoc.getBoolean("deleted"))) {
-                    TeacherScheduleResponse schedule = new TeacherScheduleResponse();
-
-                    schedule.setId(classDoc.getId());
-                    schedule.setClassName(classDoc.getString("class_name"));
-                    schedule.setTitle(classDoc.getString("description"));
-                    schedule.setStartTime(classDoc.getString("start_time"));
-                    schedule.setEndTime(classDoc.getString("end_time"));
-
-                    List<Long> scheduleDays = (List<Long>) classDoc.get("schedule_days");
-                    schedule.setSessionDate(formatScheduleDays(scheduleDays));
-
-                    schedule.setLocation("Văn phòng Code Gym, Đà Nẵng");
-
-                    schedules.add(schedule);
-                }
-            }
-            return schedules;
-        } catch (Exception e) {
-            throw new RuntimeException("Lỗi khi lấy lịch giảng dạy chung: " + e.getMessage());
-        }
-    }
-
-    private String formatScheduleDays(List<Long> days) {
-        if (days == null || days.isEmpty()) return "Chưa xếp lịch";
-
-        List<String> dayNames = new ArrayList<>();
-        for (Long day : days) {
-            if (day == 7) {
-                dayNames.add("Chủ Nhật");
-            } else {
-                long realDay = day + 1;
-                dayNames.add("Thứ " + realDay);
-            }
-        }
-        return String.join(", ", dayNames);
-    }
-    @Override
-    public Map<String, Object> getClassesByTeacher(String teacherId, int page, int size) {
-        return executeWithCatch(() -> {
-            // 1. Gọi Repo lấy dữ liệu thô (DocumentSnapshot)
-            List<DocumentSnapshot> docs = teacherRepository.getDetailedClassDocsByTeacherId(teacherId);
-
-            // 2. Mapper thực hiện công việc chuyển đổi ở tầng Service
-            List<ClassEntity> allClasses = docs.stream()
-                    .map(doc -> classMapper.fromDocument(doc)) // Sử dụng mapper ở đây
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toList());
-            int totalElements = allClasses.size();
-            int totalPages = Math.max(1, (int) Math.ceil((double) totalElements / size));
-            int fromIndex = (page - 1) * size;
-            int toIndex = Math.min(fromIndex + size, totalElements);
-
-            List<ClassEntity> paginatedList = (fromIndex < totalElements)
-                    ? allClasses.subList(fromIndex, toIndex)
-                    : new ArrayList<>();
-
-            // 3. Chuyển sang DTO Response bằng Mapper
-            List<ClassResponse> items = paginatedList.stream()
-                    .map(classMapper::toResponse)
-                    .collect(Collectors.toList());
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("items", items);
-            response.put("totalPages", totalPages);
+            response.setClasses(classResponses);
             return response;
-        }, "Lỗi hệ thống khi lấy danh sách lớp học của giảng viên");
+        }).filter(Objects::nonNull).toList();
+    }
+
+    private Map<String, HistoryEntity.ChangeDetail> buildUpdateChanges(TeacherEntity teacher, ProfileEntity profile, AccountEntity account, TeacherRequest request) {
+        Map<String, HistoryEntity.ChangeDetail> changes = new HashMap<>();
+        changes.put("full_name", changed(profile.getFullName(), request.getFullName()));
+        changes.put("email", changed(account.getEmail(), request.getEmail()));
+        changes.put("phone_number", changed(profile.getPhoneNumber(), request.getPhoneNumber()));
+        changes.put("gender", changed(profile.getGender(), request.getGender()));
+        changes.put("address", changed(profile.getAddress(), request.getAddress()));
+        changes.put("specialization", changed(teacher.getSpecialization(), request.getSpecialization()));
+        changes.put("qualification", changed(teacher.getQualification(), request.getQualification()));
+        changes.put("certifications", changed(teacher.getCertifications(), request.getCertifications()));
+        changes.put("available", changed(teacher.getAvailable(), request.getAvailable()));
+        return changes;
     }
 }

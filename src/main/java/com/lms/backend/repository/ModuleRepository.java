@@ -2,6 +2,7 @@ package com.lms.backend.repository;
 
 import com.google.api.core.ApiFuture;
 import com.google.cloud.firestore.*;
+import com.lms.backend.dto.response.PagedResponse;
 import com.lms.backend.entity.ModuleEntity;
 import com.lms.backend.mapper.ModuleMapper;
 import lombok.RequiredArgsConstructor;
@@ -46,10 +47,9 @@ public class ModuleRepository {
     }
 
     // READ ALL ACTIVE with basic pagination and optional filtering
-    public com.lms.backend.dto.response.PagedResponse<ModuleEntity> findAllActive(int page, int size, String name, String status) throws ExecutionException, InterruptedException {
+    public PagedResponse<ModuleEntity> findAllActive(int page, int size, String name, String status) throws ExecutionException, InterruptedException {
         List<ModuleEntity> all = new ArrayList<>();
         ApiFuture<QuerySnapshot> future = getModuleCollection().whereEqualTo("deleted", false).get();
-
         for (QueryDocumentSnapshot doc : future.get().getDocuments()) {
             ModuleEntity entity = moduleMapper.fromDocument(doc);
             if (entity != null) all.add(entity);

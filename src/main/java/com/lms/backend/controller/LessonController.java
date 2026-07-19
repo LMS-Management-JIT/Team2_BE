@@ -2,6 +2,7 @@ package com.lms.backend.controller;
 
 import com.lms.backend.dto.request.LessonRequest;
 import com.lms.backend.dto.response.LessonResponse;
+import com.lms.backend.dto.response.PagedResponse;
 import com.lms.backend.service.ILessonService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 @RestController
 @RequestMapping("/api/lessons")
@@ -27,8 +29,16 @@ public class LessonController {
     }
 
     @GetMapping
-    public ResponseEntity<List<LessonResponse>> getAllLessons() {
-        return ResponseEntity.ok(lessonService.getAllLessons());
+    public ResponseEntity<PagedResponse<LessonResponse>> getAllLessons(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer size,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String status
+    ) throws ExecutionException, InterruptedException {
+        if (page == null && size == null) {
+            return ResponseEntity.ok(lessonService.getAllLessons(0, 10, "", ""));
+        }
+        return ResponseEntity.ok(lessonService.getAllLessons(page, size, name, status));
     }
 
     @GetMapping("/{lessonId}")

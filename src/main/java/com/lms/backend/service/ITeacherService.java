@@ -20,6 +20,8 @@ public interface ITeacherService {
     // READ DETAIL
     TeacherResponse getTeacherDetail(String id) throws Exception;
 
+    Map<String, Object> getAllTeachers(int page, int size, String keyword, String classId, Boolean available);
+
     // UPDATE
     String updateTeacher(String id, TeacherRequest request) throws Exception;
 
@@ -33,4 +35,6 @@ public interface ITeacherService {
     List<TeacherScheduleResponse> getTeacherSchedules(String teacherId) throws Exception;
 
     Map<String, Object> getClassesByTeacher(String teacherId, int page, int size);
+
+    String deleteTeacher(String id);
 }
