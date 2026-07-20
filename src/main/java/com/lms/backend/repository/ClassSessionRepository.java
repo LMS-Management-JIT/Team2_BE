@@ -45,4 +45,29 @@ public class ClassSessionRepository {
 
         return result;
     }
+
+    public List<ClassSessionEntity> findInDateRange(String fromDate, String toDate) throws ExecutionException, InterruptedException {
+        List<ClassSessionEntity> result = new ArrayList<>();
+
+        ApiFuture<QuerySnapshot> future = firestore.collectionGroup("class_sessions")
+                .whereEqualTo("deleted", false)
+                .whereGreaterThanOrEqualTo("session_date", fromDate)
+                .whereLessThanOrEqualTo("session_date", toDate)
+                .get();
+
+        for (QueryDocumentSnapshot doc : future.get().getDocuments()) {
+            result.add(ClassSessionEntity.builder()
+                    .id(doc.getId())
+                    .classId(doc.getString("class_id"))
+                    .title(doc.getString("title"))
+                    .sessionDate(doc.getString("session_date"))
+                    .startTime(doc.getString("start_time"))
+                    .endTime(doc.getString("end_time"))
+                    .status(doc.getString("status"))
+                    .deleted(doc.getBoolean("deleted"))
+                    .build());
+        }
+
+        return result;
+    }
 }
