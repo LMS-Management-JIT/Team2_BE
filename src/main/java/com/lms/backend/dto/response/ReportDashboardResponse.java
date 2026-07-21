@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ReportDashboardResponse {
-    private AbsenceRateReportResponse absenceRate;
+    private ClassAbsenceReportResponse classAbsences;
     private NewStudentReportResponse newStudents;
     private ClassProgressReportResponse classProgress;
 }

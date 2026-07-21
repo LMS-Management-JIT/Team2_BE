@@ -39,6 +39,10 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.lms.backend.dto.response.ClassAbsenceReportResponse;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 @Service
 @RequiredArgsConstructor
 public class ReportServiceImpl implements IReportService {
@@ -392,25 +396,113 @@ public class ReportServiceImpl implements IReportService {
     }
 
     @Override
-    public ReportDashboardResponse getReportDashboard(String yearMonth, String classId, String groupBy) {
-        YearMonth ym = (yearMonth == null || yearMonth.isBlank())
-                ? YearMonth.now()
-                : YearMonth.parse(yearMonth.trim());
+    public ClassAbsenceReportResponse getClassAbsenceReport(String classId, LocalDate from, LocalDate to) {
+        if (classId == null || classId.isBlank()) {
+            throw new BadRequestException("classId không được để trống");
+        }
+        if (from == null || to == null) {
+            throw new BadRequestException("from, to không được để trống");
+        }
+        if (to.isBefore(from)) {
+            throw new BadRequestException("'to' không được đứng trước 'from'");
+        }
 
+        try {
+            ClassEntity classEntity = classRepository.findById(classId);
+            if (classEntity == null || classEntity.isDeleted()) {
+                throw new ResourceNotFoundException("Lớp học không tồn tại hoặc đã bị xóa!");
+            }
+
+            List<ClassSessionEntity> sessions = classSessionRepository.findByClassId(classId).stream()
+                    .filter(s -> !Boolean.TRUE.equals(s.getDeleted()))
+                    .filter(s -> s.getSessionDate() != null && !s.getSessionDate().isBlank())
+                    .filter(s -> {
+                        LocalDate d = LocalDate.parse(s.getSessionDate());
+                        return !d.isBefore(from) && !d.isAfter(to);
+                    })
+                    .sorted((a, b) -> a.getSessionDate().compareTo(b.getSessionDate()))
+                    .toList();
+
+            Map<String, List<ClassAbsenceReportResponse.AbsenceDetail>> byStudent = new LinkedHashMap<>();
+
+            for (ClassSessionEntity session : sessions) {
+                List<AttendanceEntity> attendances =
+                        attendanceRepository.findBySession(classId, session.getId());
+
+                for (AttendanceEntity att : attendances) {
+                    if (att.getStatus() == null || !ABSENT_STATUSES.contains(att.getStatus().trim())) {
+                        continue;
+                    }
+                    byStudent.computeIfAbsent(att.getStudentId(), k -> new ArrayList<>()).add(ClassAbsenceReportResponse.AbsenceDetail.builder()
+                                    .sessionId(session.getId())
+                                    .sessionTitle(session.getTitle())
+                                    .sessionDate(session.getSessionDate())
+                                    .status(att.getStatus().trim())
+                                    .note(att.getNote() != null ? att.getNote() : "")
+                                    .build());
+                }
+            }
+
+            List<ClassAbsenceReportResponse.StudentAbsence> students = new ArrayList<>();
+            int totalAbsences = 0;
+
+            for (var e : byStudent.entrySet()) {
+                String studentId = e.getKey();
+                List<ClassAbsenceReportResponse.AbsenceDetail> details = e.getValue();
+                totalAbsences += details.size();
+
+                String fullName = "Chưa cập nhật";
+                StudentEntity student = studentRepository.findById(studentId);
+                if (student != null && !Boolean.TRUE.equals(student.getDeleted())) {
+                    fullName = resolveFullName(student);
+                }
+
+                students.add(ClassAbsenceReportResponse.StudentAbsence.builder()
+                        .studentId(studentId)
+                        .fullName(fullName)
+                        .absenceCount(details.size())
+                        .details(details)
+                        .build());
+            }
+
+            students.sort((a, b) -> Integer.compare(b.getAbsenceCount(), a.getAbsenceCount()));
+
+            return ClassAbsenceReportResponse.builder()
+                    .classId(classId)
+                    .className(classEntity.getClassName())
+                    .from(from.toString())
+                    .to(to.toString())
+                    .totalAbsences(totalAbsences)
+                    .totalStudentsAbsent(students.size())
+                    .students(students)
+                    .build();
+        } catch (ResourceNotFoundException | BadRequestException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi hệ thống khi lấy báo cáo vắng theo lớp: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public ReportDashboardResponse getReportDashboard(String yearMonth, String absenceClassId, String progressClassId) {
+        YearMonth ym = (yearMonth == null || yearMonth.isBlank()) ? YearMonth.now() : YearMonth.parse(yearMonth.trim());
         LocalDate from = ym.atDay(1);
         LocalDate to = ym.atEndOfMonth();
-        String normalizedGroupBy = (groupBy == null || groupBy.isBlank()) ? "WEEK" : groupBy.trim().toUpperCase();
 
-        AbsenceRateReportResponse absenceRate = getAbsenceRateReport(from, to, normalizedGroupBy);
+        ClassAbsenceReportResponse classAbsences = null;
+        if (absenceClassId != null && !absenceClassId.isBlank()) {
+            classAbsences = getClassAbsenceReport(absenceClassId, from, to);
+        }
+
         NewStudentReportResponse newStudents = getNewStudentReport(ym);
 
         ClassProgressReportResponse classProgress = null;
-        if (classId != null && !classId.isBlank()) {
-            classProgress = getClassProgressReport(classId);
+        if (progressClassId != null && !progressClassId.isBlank()) {
+            classProgress = getClassProgressReport(progressClassId);
         }
 
         return ReportDashboardResponse.builder()
-                .absenceRate(absenceRate)
+                .classAbsences(classAbsences)
                 .newStudents(newStudents)
                 .classProgress(classProgress)
                 .build();
