@@ -1,6 +1,7 @@
 package com.lms.backend.service;
 
 import com.lms.backend.dto.response.AbsenceRateReportResponse;
+import com.lms.backend.dto.response.ClassAbsenceReportResponse;
 import com.lms.backend.dto.response.ClassProgressReportResponse;
 import com.lms.backend.dto.response.NewStudentReportResponse;
 import com.lms.backend.dto.response.ReportDashboardResponse;
@@ -16,5 +17,11 @@ public interface IReportService {
 
     ClassProgressReportResponse getClassProgressReport(String classId);
 
-    ReportDashboardResponse getReportDashboard(String yearMonth, String classId, String groupBy);
+    ClassAbsenceReportResponse getClassAbsenceReport(String classId, LocalDate from, LocalDate to);
+
+    ReportDashboardResponse getReportDashboard(
+            String yearMonth,
+            String absenceClassId,
+            String progressClassId
+    );
 }
