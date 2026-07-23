@@ -19,7 +19,6 @@ public class TopicLessonMapper {
 
     public TopicLessonEntity toEntity(TopicLessonRequest request) {
         if (request == null) return null;
-
         return TopicLessonEntity.builder()
                 .topicId(request.getTopicId())
                 .lessonId(request.getLessonId())
@@ -29,35 +28,24 @@ public class TopicLessonMapper {
 
     public void updateEntity(TopicLessonEntity entity, TopicLessonRequest request) {
         if (entity == null || request == null) return;
-
         entity.setTopicId(request.getTopicId());
         entity.setLessonId(request.getLessonId());
         entity.setLessonOrder(request.getLessonOrder());
     }
 
-    // ================= FIRESTORE MAP =================
-
     public Map<String, Object> toFirestoreMap(TopicLessonEntity entity) {
         Map<String, Object> map = new HashMap<>();
-
         map.put("topic_id", entity.getTopicId());
         map.put("lesson_id", entity.getLessonId());
         map.put("lesson_order", entity.getLessonOrder());
         map.put("created_by", entity.getCreatedBy());
         map.put("updated_by", entity.getUpdatedBy());
 
-        // Timestamps as String (safe)
-        if (entity.getCreatedAt() != null) {
-            map.put("create_at", entity.getCreatedAt().toString());
-        }
-        if (entity.getUpdatedAt() != null) {
-            map.put("update_at", entity.getUpdatedAt().toString());
-        }
+        if (entity.getCreatedAt() != null) map.put("create_at", entity.getCreatedAt().toString());
+        if (entity.getUpdatedAt() != null) map.put("update_at", entity.getUpdatedAt().toString());
 
         return map;
     }
-
-    // ================= FROM DOCUMENT =================
 
     public TopicLessonEntity fromDocument(DocumentSnapshot doc) {
         if (doc == null || !doc.exists()) return null;
@@ -72,8 +60,8 @@ public class TopicLessonMapper {
                 .lessonOrder(lessonOrder)
                 .createdBy(doc.getString("created_by"))
                 .updatedBy(doc.getString("updated_by"))
-                .createdAt(convertToLocalDateTime(doc.getDate("create_at"), doc.getDate("createdAt")))
-                .updatedAt(convertToLocalDateTime(doc.getDate("update_at"), doc.getDate("updatedAt")))
+/*                .createdAt(convertToLocalDateTime(doc.getDate("create_at"), doc.getDate("createdAt")))
+                .updatedAt(convertToLocalDateTime(doc.getDate("update_at"), doc.getDate("updatedAt")))*/
                 .build();
     }
 
@@ -85,8 +73,6 @@ public class TopicLessonMapper {
         }
         return null;
     }
-
-    // ================= RESPONSE =================
 
     public TopicLessonResponse toResponse(TopicLessonEntity entity) {
         if (entity == null) return null;
@@ -105,11 +91,10 @@ public class TopicLessonMapper {
 
     public TopicLessonEntity toEntityFromRequest(String topicId, String lessonId, String createdBy) {
         LocalDateTime now = LocalDateTime.now(VIETNAM_ZONE);
-
         return TopicLessonEntity.builder()
                 .topicId(topicId)
                 .lessonId(lessonId)
-                .lessonOrder(0) // will be auto-assigned in service
+                .lessonOrder(0)
                 .createdBy(createdBy)
                 .updatedBy(createdBy)
                 .createdAt(now)

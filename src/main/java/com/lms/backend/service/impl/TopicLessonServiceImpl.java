@@ -5,7 +5,6 @@ import com.lms.backend.dto.request.AddLessonToTopicRequest;
 import com.lms.backend.dto.request.ReorderLessonsRequest;
 import com.lms.backend.dto.response.PagedResponse;
 import com.lms.backend.dto.response.TopicLessonResponse;
-import com.lms.backend.entity.TopicEntity;
 import com.lms.backend.entity.TopicLessonEntity;
 import com.lms.backend.exception.ResourceNotFoundException;
 import com.lms.backend.mapper.TopicLessonMapper;
@@ -16,7 +15,6 @@ import com.lms.backend.service.ITopicLessonService;
 import com.lms.backend.service.ITopicService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -35,6 +33,7 @@ public class TopicLessonServiceImpl implements ITopicLessonService {
     private final ITopicService topicService;
     private final ILessonService lessonService;
     private final Firestore firestore;
+
     @Override
     public void delete(String id) throws ExecutionException, InterruptedException {
         TopicLessonEntity entity = repository.findById(id);
@@ -52,7 +51,7 @@ public class TopicLessonServiceImpl implements ITopicLessonService {
     @Override
     public TopicLessonResponse addLessonToTopic(AddLessonToTopicRequest request) throws ExecutionException, InterruptedException {
         // Business checks
-        if (!topicService.existsById(request.getTopicId()) ) {
+        if (!topicService.existsById(request.getTopicId())) {
             throw new ResourceNotFoundException("Topic not found with id: " + request.getTopicId());
         }
         if (!lessonService.existsById(request.getLessonId())) {
@@ -109,9 +108,7 @@ public class TopicLessonServiceImpl implements ITopicLessonService {
     }
 
     @Override
-    public PagedResponse<TopicLessonResponse> getAllLessonByTopic(
-            int page, int size, String topicId) {
-
+    public PagedResponse<TopicLessonResponse> getAllLessonByTopic(int page, int size, String topicId) {
         List<TopicLessonEntity> entities = repository.findAllByTopicAndFilters(topicId, page, size);
 
         boolean hasNext = entities.size() > size;
@@ -123,15 +120,15 @@ public class TopicLessonServiceImpl implements ITopicLessonService {
                 .map(mapper::toResponse)
                 .collect(Collectors.toList());
 
-        long totalElements = repository.countByTopicId(topicId);
+        long total = repository.countByTopicId(topicId);
 
-        int totalPages = size > 0 ? (int) Math.ceil((double) totalElements / size) : 0;
+        int totalPages = size > 0 ? (int) Math.ceil((double) total / size) : 0;
 
         return PagedResponse.<TopicLessonResponse>builder()
                 .content(responses)
                 .page(page)
                 .size(size)
-                .totalElements(totalElements)
+                .totalElements(total)
                 .totalPages(totalPages)
                 .hasNext(hasNext)
                 .hasPrevious(page > 0)

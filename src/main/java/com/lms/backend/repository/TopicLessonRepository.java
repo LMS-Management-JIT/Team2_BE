@@ -1,5 +1,6 @@
 package com.lms.backend.repository;
 
+import com.google.api.core.ApiFuture;
 import com.google.cloud.firestore.*;
 import com.lms.backend.entity.TopicLessonEntity;
 import com.lms.backend.mapper.TopicLessonMapper;
@@ -32,7 +33,7 @@ public class TopicLessonRepository {
             Query query = firestore.collection("topic_lessons");
 
              if (StringUtils.hasText(topicId)) {
-                query = query.whereEqualTo("topicId", topicId);
+                query = query.whereEqualTo("topic_id", topicId);
             }
 
             return query.get().get().size();
@@ -62,8 +63,8 @@ public class TopicLessonRepository {
     public Optional<TopicLessonEntity> findByTopicIdAndLessonId(String topicId, String lessonId) {
         try {
             Query query = firestore.collection(COLLECTION_NAME)
-                    .whereEqualTo("topicId", topicId)
-                    .whereEqualTo("lessonId", lessonId)
+                    .whereEqualTo("topic_id", topicId)
+                    .whereEqualTo("lesson_id", lessonId)
                     .limit(1);
 
             List<QueryDocumentSnapshot> documents = query.get().get().getDocuments();
@@ -82,7 +83,7 @@ public class TopicLessonRepository {
         try {
             firestore.collection(COLLECTION_NAME)
                     .document(id)
-                    .update("lessonOrder", newOrder, "updatedAt", Instant.now())
+                    .update("lesson_order", newOrder, "updatedAt", Instant.now())
                     .get();
         } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException("Cannot update lesson order", e);
@@ -92,7 +93,7 @@ public class TopicLessonRepository {
     public long countByTopic(String topicId) {
         try {
             Query query = firestore.collection(COLLECTION_NAME)
-                    .whereEqualTo("topicId", topicId);
+                    .whereEqualTo("topic_id", topicId);
             return query.get().get().size();
         } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException("Cannot count by topic", e);
@@ -112,7 +113,7 @@ public class TopicLessonRepository {
         try {
             List<TopicLessonEntity> list = new ArrayList<>();
             Query query = firestore.collection(COLLECTION_NAME)
-                    .whereEqualTo("lessonId", lessonId);
+                    .whereEqualTo("lesson_id", lessonId);
 
             for (DocumentSnapshot doc : query.get().get().getDocuments()) {
                 list.add(topicLessonMapper.fromDocument(doc));
@@ -166,27 +167,33 @@ public class TopicLessonRepository {
             }
         }
 
-        public List<TopicLessonEntity> findAllByTopicAndFilters(String topicId, int page, int size) {
-            try {
-                Query query = firestore.collection(COLLECTION_NAME);
+    public List<TopicLessonEntity> findAllByTopicAndFilters(String topicId, int page, int size) {
+        try {
+            Query query = firestore.collection(COLLECTION_NAME);
 
-                if (StringUtils.hasText(topicId)) {
-                    query = query.whereEqualTo("topic_id", topicId);
-                }
-
-                query = query.orderBy("lesson_order", Query.Direction.ASCENDING)
-                        .offset(page * size)
-                        .limit(size + 1);
-
-                List<TopicLessonEntity> list = new ArrayList<>();
-                for (DocumentSnapshot doc : query.get().get().getDocuments()) {
-                    list.add(topicLessonMapper.fromDocument(doc));
-                }
-                return list;
-            } catch (InterruptedException | ExecutionException e) {
-                throw new RuntimeException("Failed to fetch TopicLesson by topicId", e);
+            if (StringUtils.hasText(topicId)) {
+                query = query.whereEqualTo("topic_id", topicId);   // Use exact Firestore field name
             }
+
+            query = query.orderBy("lesson_order", Query.Direction.ASCENDING)
+                    .offset(page * size)
+                    .limit(size + 1);
+
+            List<TopicLessonEntity> list = new ArrayList<>();
+            ApiFuture<QuerySnapshot> future = query.get();
+
+            System.out.println("Found documents: " + future.get().size()); // Debug
+
+            for (DocumentSnapshot doc : future.get().getDocuments()) {
+                list.add(topicLessonMapper.fromDocument(doc));
+            }
+
+            return list;
+
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException("Failed to fetch TopicLesson by topicId", e);
         }
+    }
 
         public long countByTopicId(String topicId) {
             try {
