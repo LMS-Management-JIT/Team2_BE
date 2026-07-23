@@ -28,9 +28,6 @@ public class TopicLessonEntity {
     @PropertyName("lesson_order")
     private Integer lessonOrder;
 
-    @PropertyName("deleted")
-    private Boolean deleted;
-
     @Exclude
     private LocalDateTime createdAt;
 

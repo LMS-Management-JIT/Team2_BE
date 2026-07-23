@@ -26,7 +26,7 @@ public class TopicController {
         return ResponseEntity.ok(topicService.getTopicsByModule(moduleId));
     }
 
-    @GetMapping("/{topicId}/lessons")
+    @GetMapping("/{topicId}/content")
     public ResponseEntity<List<LessonSummaryResponse>> getLessonsByTopic(
             @PathVariable String topicId)
             throws ExecutionException, InterruptedException {

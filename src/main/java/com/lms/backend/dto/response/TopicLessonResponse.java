@@ -12,22 +12,12 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TopicLessonResponse {
-
     private String id;
-
     private String topicId;
-
     private String lessonId;
-
     private Integer lessonOrder;
-
-    private Boolean deleted;
-
     private String createdBy;
-
     private String updatedBy;
-
     private LocalDateTime createdAt;
-
     private LocalDateTime updatedAt;
 }

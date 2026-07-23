@@ -22,6 +22,7 @@ public class LessonResponse {
     private Boolean published;
     private String content;
     private String videoUrl;
+    private String imageUrl;
     private Integer duration;
     private String description;
     private String starterCode;
