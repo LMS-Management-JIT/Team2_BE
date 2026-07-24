@@ -1,6 +1,8 @@
 package com.lms.backend.controller;
 
-import com.lms.backend.dto.request.TopicLessonRequest;
+import com.lms.backend.dto.request.AddLessonToTopicRequest;
+import com.lms.backend.dto.request.ReorderLessonsRequest;
+import com.lms.backend.dto.response.PagedResponse;
 import com.lms.backend.dto.response.TopicLessonResponse;
 import com.lms.backend.service.ITopicLessonService;
 import jakarta.validation.Valid;
@@ -9,76 +11,56 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 @RestController
 @RequestMapping("/api/topic-lessons")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class TopicLessonController {
 
-    private final ITopicLessonService topicLessonService;
+    private final ITopicLessonService service;
 
-    @PostMapping
-    public ResponseEntity<TopicLessonResponse> create(
-            @Valid @RequestBody TopicLessonRequest request) {
-
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(topicLessonService.create(request));
+    @PostMapping("/{topicId}")
+    public ResponseEntity<TopicLessonResponse> addLessonToTopic(
+            @PathVariable String topicId,
+            @RequestBody AddLessonToTopicRequest request) throws ExecutionException, InterruptedException {
+        request.setTopicId(topicId);
+        TopicLessonResponse response = service.addLessonToTopic(request);
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
     @GetMapping
-    public ResponseEntity<List<TopicLessonResponse>> getAll() {
+    public ResponseEntity<PagedResponse<TopicLessonResponse>> getAllLessonByTopic(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String topicId) throws ExecutionException, InterruptedException {
 
-        return ResponseEntity.ok(
-                topicLessonService.getAll()
-        );
+        PagedResponse<TopicLessonResponse> response = service.getAllLessonByTopic(page, size, topicId);
+        return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<TopicLessonResponse> getById(
-            @PathVariable String id) {
-
-        return ResponseEntity.ok(
-                topicLessonService.getById(id)
-        );
+    @DeleteMapping("/{topicId}/{lessonId}")
+    public ResponseEntity<Void> removeLessonFromTopic(
+            @PathVariable String topicId,
+            @PathVariable String lessonId,
+            @RequestParam(required = false) String updatedBy) {
+        service.removeLessonFromTopic(topicId, lessonId, updatedBy);
+        return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/topic/{topicId}")
-    public ResponseEntity<List<TopicLessonResponse>> getByTopicId(
-            @PathVariable String topicId) {
-
-        return ResponseEntity.ok(
-                topicLessonService.getByTopicId(topicId)
-        );
+    @PutMapping("/{topicId}/reorder")
+    public ResponseEntity<Void> reorderLessons(
+            @PathVariable String topicId,
+            @RequestBody ReorderLessonsRequest request) throws ExecutionException, InterruptedException {
+        request.setTopicId(topicId);
+        service.reorderLessons(request);
+        return ResponseEntity.ok().build();
     }
 
-    @GetMapping("/lesson/{lessonId}")
-    public ResponseEntity<List<TopicLessonResponse>> getByLessonId(
+    @GetMapping("/exists/{lessonId}")
+    public ResponseEntity<Boolean> exists(
+            @PathVariable String topicId,
             @PathVariable String lessonId) {
-
-        return ResponseEntity.ok(
-                topicLessonService.getByLessonId(lessonId)
-        );
-    }
-
-    @PutMapping("/{id}")
-    public ResponseEntity<TopicLessonResponse> update(
-            @PathVariable String id,
-            @Valid @RequestBody TopicLessonRequest request) {
-
-        return ResponseEntity.ok(
-                topicLessonService.update(id, request)
-        );
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<String> delete(
-            @PathVariable String id) {
-
-        topicLessonService.delete(id);
-
-        return ResponseEntity.ok("Topic lesson deleted successfully.");
+        return ResponseEntity.ok(service.exists(topicId, lessonId));
     }
 }

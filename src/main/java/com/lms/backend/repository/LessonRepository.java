@@ -100,7 +100,7 @@ public class LessonRepository {
         return new PagedResponse<>(pageItems, total, safePage, safeSize, totalPages);
     }
 
-    // FIND BY ID
+    // FIND BY ID (any)
     public LessonEntity findById(String id) {
 
         try {
@@ -117,6 +117,25 @@ public class LessonRepository {
 
             return lessonMapper.fromDocument(snapshot);
 
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException("Cannot find lesson", e);
+        }
+    }
+
+    // FIND BY ID but only if not deleted
+    public LessonEntity findActiveById(String id) {
+        try {
+            DocumentSnapshot snapshot = firestore()
+                    .collection(COLLECTION_NAME)
+                    .document(id)
+                    .get()
+                    .get();
+
+            if (!snapshot.exists()) return null;
+
+            LessonEntity entity = lessonMapper.fromDocument(snapshot);
+            if (entity == null || entity.isDeleted()) return null;
+            return entity;
         } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException("Cannot find lesson", e);
         }

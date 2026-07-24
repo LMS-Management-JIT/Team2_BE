@@ -72,18 +72,18 @@ public class ModuleServiceImpl implements IModuleService {
     @SneakyThrows
     public List<ModuleResponse> getAllModules() {
         com.lms.backend.dto.response.PagedResponse<ModuleEntity> result = moduleRepository.findAllActive(0, Integer.MAX_VALUE, null, null);
-        return result.getItems().stream().map(moduleMapper::toResponse).collect(Collectors.toList());
+        return result.getContent().stream().map(moduleMapper::toResponse).collect(Collectors.toList());
     }
 
     @Override
     public PagedResponse<ModuleResponse> getAllModulesPage(int page, int size, String name, String status) {
         return executeWithCatch(() -> {
             PagedResponse<ModuleEntity> entityPage = moduleRepository.findAllActive(page, size, name, status);
-            List<ModuleResponse> responseList = entityPage.getItems().stream()
+            List<ModuleResponse> responseList = entityPage.getContent().stream()
                     .map(moduleMapper::toResponse)
                     .collect(Collectors.toList());
 
-            return new PagedResponse<>(responseList, entityPage.getTotalItems(), entityPage.getPage(), entityPage.getSize(), entityPage.getTotalPages());
+            return new PagedResponse<>(responseList, entityPage.getTotalElements(), entityPage.getPage(), entityPage.getSize(), entityPage.getTotalPages());
         }, "Lỗi khi lấy danh sách Module theo trang");
     }
 
