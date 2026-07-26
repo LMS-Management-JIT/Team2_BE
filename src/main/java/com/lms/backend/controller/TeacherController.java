@@ -1,7 +1,9 @@
 package com.lms.backend.controller;
 
+import com.lms.backend.dto.request.ClassNotificationRequest;
 import com.lms.backend.dto.request.SaveAttendanceRequest;
 import com.lms.backend.dto.request.TeacherRequest;
+import com.lms.backend.dto.response.ClassStudentOptionResponse;
 import com.lms.backend.dto.response.TeacherResponse;
 import com.lms.backend.dto.response.TeacherScheduleResponse;
 import com.lms.backend.dto.response.TeacherStatsResponse;
@@ -139,5 +141,21 @@ public class TeacherController {
             @PathVariable String sessionId,
             @RequestBody SaveAttendanceRequest request) {
         return ResponseEntity.ok(teacherService.saveSessionAttendance(classId, sessionId, request.getRecords()));
+    }
+
+    // Lấy danh sách học viên của 1 lớp (dùng cho bước chọn người nhận thông báo)
+    @GetMapping("/classes/{classId}/students")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public ResponseEntity<List<ClassStudentOptionResponse>> getClassStudents(@PathVariable String classId) {
+        return ResponseEntity.ok(teacherService.getClassStudents(classId));
+    }
+
+    // Gửi thông báo cho học viên trong 1 lớp (toàn bộ hoặc chọn tay)
+    @PostMapping("/classes/{classId}/notify")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public ResponseEntity<String> sendClassNotification(
+            @PathVariable String classId,
+            @RequestBody ClassNotificationRequest request) {
+        return ResponseEntity.ok(teacherService.sendClassNotification(classId, request));
     }
 }
