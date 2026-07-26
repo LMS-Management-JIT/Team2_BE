@@ -5,7 +5,6 @@ import com.lms.backend.dto.request.ReorderLessonsRequest;
 import com.lms.backend.dto.response.PagedResponse;
 import com.lms.backend.dto.response.TopicLessonResponse;
 import com.lms.backend.service.ITopicLessonService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

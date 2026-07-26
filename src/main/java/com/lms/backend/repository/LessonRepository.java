@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -176,6 +177,32 @@ public class LessonRepository {
 
         } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException("Cannot find lessons by course", e);
+        }
+    }
+    public List<LessonEntity> findByIds(List<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        try {
+            // Firestore whereIn limit is 30 items
+            List<LessonEntity> result = new ArrayList<>();
+
+            // Split into chunks of 30
+            for (int i = 0; i < ids.size(); i += 30) {
+                List<String> chunk = ids.subList(i, Math.min(i + 30, ids.size()));
+
+                Query query = firestore.collection("lessons")
+                        .whereIn(FieldPath.documentId(), chunk);
+
+                for (DocumentSnapshot doc : query.get().get().getDocuments()) {
+                    result.add(lessonMapper.fromDocument(doc));
+                }
+            }
+
+            return result;
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException("Failed to fetch lessons by ids", e);
         }
     }
 }

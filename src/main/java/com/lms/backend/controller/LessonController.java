@@ -59,7 +59,11 @@ public class LessonController {
                 lessonService.updateLesson(lessonId, request)
         );
     }
-
+    @GetMapping("/available")
+    public ResponseEntity<List<LessonResponse>> getAvailableLessons(
+            @RequestParam String topicId) throws ExecutionException, InterruptedException {
+        return ResponseEntity.ok(lessonService.getAvailableLessons(topicId));
+    }
     @DeleteMapping("/{lessonId}")
     public ResponseEntity<String> deleteLesson(
             @PathVariable String lessonId) {
