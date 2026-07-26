@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -27,8 +28,10 @@ public class ClassMapper {
                 .courseId(request.getCourseId())
                 .startDateClass(request.getStartDateClass())
                 .endDateClass(request.getEndDateClass())
-                .build();
-    }
+                .scheduleDays(request.getScheduleDays())
+                .startTime(request.getStartTime())
+                .endTime(request.getEndTime())
+                .build();    }
 
     public ClassResponse toResponse(ClassEntity entity) {
         if (entity == null) return null;
@@ -48,6 +51,9 @@ public class ClassMapper {
         response.setEndDateClass(entity.getEndDateClass());
         response.setCreateDate(entity.getCreateDate());
         response.setUpdateDate(entity.getUpdateDate());
+        response.setScheduleDays(entity.getScheduleDays());
+        response.setStartTime(entity.getStartTime());
+        response.setEndTime(entity.getEndTime());
 
         return response;
     }
@@ -63,6 +69,9 @@ public class ClassMapper {
         existingEntity.setCourseId(request.getCourseId());
         existingEntity.setStartDateClass(request.getStartDateClass());
         existingEntity.setEndDateClass(request.getEndDateClass());
+        existingEntity.setScheduleDays(request.getScheduleDays());
+        existingEntity.setStartTime(request.getStartTime());
+        existingEntity.setEndTime(request.getEndTime());
     }
 
     public Map<String, Object> toFirestoreMap(ClassEntity entity) {
@@ -78,8 +87,10 @@ public class ClassMapper {
         map.put("course_id", entity.getCourseId());
         map.put("created_by", entity.getCreatedBy());
         map.put("update_by", entity.getUpdateBy());
+        map.put("schedule_days", entity.getScheduleDays());
+        map.put("start_time", entity.getStartTime());
+        map.put("end_time", entity.getEndTime());
 
-        // Đổi LocalDateTime thành Date cho Firestore
         map.put("start_date_class", toTimestamp(entity.getStartDateClass()));
         map.put("end_date_class", toTimestamp(entity.getEndDateClass()));
         map.put("create_date", toTimestamp(entity.getCreateDate()));
@@ -109,6 +120,26 @@ public class ClassMapper {
             }
             if (doc.contains("note")) {
                 entity.setNote(doc.getString("note"));
+            }
+            if (doc.contains("schedule_days")) {
+                Object daysObj = doc.get("schedule_days");
+                if (daysObj instanceof List) {
+                    List<Integer> days = new java.util.ArrayList<>();
+                    // Duyệt qua từng phần tử với List<?> (Wildcard) để báo cho Java biết mình sẽ tự check an toàn
+                    for (Object item : (List<?>) daysObj) {
+                        if (item instanceof Number) {
+                            // Ép kiểu an toàn từ Long của Firestore về Integer của Java
+                            days.add(((Number) item).intValue());
+                        }
+                    }
+                    entity.setScheduleDays(days);
+                }
+            }
+            if (doc.contains("start_time")) {
+                entity.setStartTime(doc.getString("start_time"));
+            }
+            if (doc.contains("end_time")) {
+                entity.setEndTime(doc.getString("end_time"));
             }
             entity.setStartDateClass(toLocalDateTime(doc.getDate("start_date_class")));
             entity.setEndDateClass(toLocalDateTime(doc.getDate("end_date_class")));

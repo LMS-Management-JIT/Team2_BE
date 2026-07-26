@@ -1,11 +1,13 @@
 package com.lms.backend.entity;
 
 import com.google.cloud.firestore.annotation.DocumentId;
+import com.google.cloud.firestore.annotation.Exclude;
 import com.google.cloud.firestore.annotation.PropertyName;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 
@@ -18,16 +20,22 @@ public class TopicEntity {
     @DocumentId
     private String id;
 
+    @PropertyName("topic_code")
+    private String topicCode;
+
     @PropertyName("topic_name")
     private String topicName;
+
+    @PropertyName("description")
+    private String description;
 
     @PropertyName("deleted")
     private boolean deleted;
 
-    @PropertyName("create_date")
+    @Exclude
     private LocalDateTime createdAt;
 
-    @PropertyName("update_date")
+    @Exclude
     private LocalDateTime updatedAt;
 
     @PropertyName("created_by")

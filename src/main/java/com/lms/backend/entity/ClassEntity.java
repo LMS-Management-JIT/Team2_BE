@@ -2,6 +2,7 @@ package com.lms.backend.entity;
 
 import com.google.cloud.firestore.annotation.DocumentId;
 import com.google.cloud.firestore.annotation.Exclude;
+import com.google.cloud.firestore.annotation.IgnoreExtraProperties;
 import com.google.cloud.firestore.annotation.PropertyName;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,11 +10,13 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@IgnoreExtraProperties
 public class ClassEntity {
 
     @DocumentId
@@ -36,6 +39,15 @@ public class ClassEntity {
 
     @PropertyName("update_by")
     private String updateBy;
+
+    @PropertyName("schedule_days")
+    private List<Integer> scheduleDays;
+
+    @PropertyName("start_time")
+    private String startTime;
+
+    @PropertyName("end_time")
+    private String endTime;
 
     @Exclude
     private LocalDateTime startDateClass;

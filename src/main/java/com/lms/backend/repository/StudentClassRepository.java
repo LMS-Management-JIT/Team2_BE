@@ -92,6 +92,25 @@ public class StudentClassRepository {
             throw new RuntimeException("Lỗi khi lấy danh sách lớp của học viên", e);
         }
     }
+        public List<StudentClassEntity> findByClassId(String classId) throws ExecutionException, InterruptedException {
+            List<StudentClassEntity> result = new ArrayList<>();
+
+            ApiFuture<QuerySnapshot> future = getStudentClassCollection()
+                    .whereEqualTo("class_id", classId)
+                    .whereEqualTo("deleted", false)
+                    .get();
+
+            for (QueryDocumentSnapshot doc : future.get().getDocuments()) {
+                result.add(StudentClassEntity.builder()
+                        .id(doc.getId())
+                        .studentId(doc.getString("student_id"))
+                        .classId(doc.getString("class_id"))
+                        .deleted(doc.getBoolean("deleted"))
+                        .build());
+            }
+
+            return result;
+        }
 
     public void syncStudentClasses(String studentId, List<StudentClassRequest> requests, String updatedBy) throws ExecutionException, InterruptedException {
 

@@ -18,10 +18,10 @@ public class LessonResponse {
     private String id;
     private String lessonName;
     private LessonType type;
-    private Integer lessonOrder;
     private Boolean published;
     private String content;
     private String videoUrl;
+    private String imageUrl;
     private Integer duration;
     private String description;
     private String starterCode;

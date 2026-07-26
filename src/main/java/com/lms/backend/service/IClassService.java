@@ -10,6 +10,9 @@ import java.util.Map;
 public interface IClassService {
     String createClass(ClassRequest request);
 
+    // Hàm lấy lịch trình lớp học gọi từ Impl
+    List<Map<String, Object>> getClassSessions(String classId);
+
     Map<String, Object> getAllClasses(int page, int size, String name, String program, String status, String startDate, String endDate);
     ClassDetailResponse getClassDetail(String classId);
 

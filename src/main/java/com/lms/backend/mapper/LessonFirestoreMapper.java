@@ -20,7 +20,6 @@ public class LessonFirestoreMapper {
         Map<String, Object> map = new HashMap<>();
 
         map.put("lesson_name", lesson.getLessonName());
-        map.put("lesson_order", lesson.getLessonOrder());
         map.put("published", lesson.getPublished());
         map.put("content", lesson.getContent());
         map.put("video_url", lesson.getVideoUrl());
@@ -49,7 +48,6 @@ public class LessonFirestoreMapper {
         return LessonEntity.builder()
                 .id(doc.getId())
                 .lessonName(doc.getString("lesson_name"))
-                .lessonOrder(lessonOrder == null ? null : lessonOrder.intValue())
                 .published(doc.getBoolean("published"))
                 .content(doc.getString("content"))
                 .videoUrl(doc.getString("video_url"))

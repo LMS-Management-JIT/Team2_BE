@@ -140,15 +140,52 @@ public class ClassServiceImpl implements IClassService {
     public String createClass(ClassRequest request) {
         String email = getCurrentUserEmail();
         validateClassLogic(request, false, null);
+
         String newId = executeWithCatch(() -> {
+            // 1. Gọi Repo lưu thông tin lớp học trước để lấy classId
             ClassEntity entity = classMapper.toEntity(request);
             entity.setStartDateClass(request.getStartDateClass());
             entity.setCreateDate(LocalDateTime.now());
             entity.setCreatedBy(email);
             entity.setDeleted(false);
-            return classRepository.save(entity);
-        }, "Lỗi hệ thống khi tạo lớp học");
+            String classId = classRepository.save(entity);
 
+            // 2. Xử lý logic tính toán lịch trình (Thuần Java logic)
+            if (request.getScheduleDays() != null && !request.getScheduleDays().isEmpty()) {
+                List<Map<String, Object>> sessionsDataList = new ArrayList<>();
+
+                java.time.LocalDate currentDate = request.getStartDateClass().toLocalDate();
+                java.time.LocalDate endDate = request.getEndDateClass().toLocalDate();
+                int sessionCount = 1;
+
+                while (!currentDate.isAfter(endDate)) {
+                    int currentDayOfWeek = currentDate.getDayOfWeek().getValue(); // 1 = Thứ 2, ..., 7 = Chủ Nhật
+
+                    if (request.getScheduleDays().contains(currentDayOfWeek)) {
+                        Map<String, Object> session = new HashMap<>();
+                        session.put("class_id", classId);
+                        session.put("session_date", currentDate.toString());
+                        session.put("start_time", request.getStartTime());
+                        session.put("end_time", request.getEndTime());
+                        session.put("title", "Buổi " + sessionCount);
+                        session.put("status", "Chưa điểm danh");
+                        session.put("deleted", false);
+
+                        sessionsDataList.add(session);
+                        sessionCount++;
+                    }
+                    currentDate = currentDate.plusDays(1);
+                }
+
+                if (!sessionsDataList.isEmpty()) {
+                    classRepository.saveClassSessionsBatch(classId, sessionsDataList);
+                }
+            }
+
+            return classId;
+        }, "Lỗi hệ thống khi tạo lớp học và sinh lịch học");
+
+        // Ghi nhận History (Giữ nguyên)
         historyService.record(HistoryRequest.builder()
                 .action(ActionType.ADD)
                 .actorId(email)
@@ -162,6 +199,20 @@ public class ClassServiceImpl implements IClassService {
         return newId;
     }
 
+    // Hàm lấy lịch trình lớp học gọi từ Impl
+    @Override
+    public List<Map<String, Object>> getClassSessions(String classId) {
+        checkClassExists(classId); // Đảm bảo lớp học tồn tại
+        return executeWithCatch(() -> {
+            List<QueryDocumentSnapshot> docs = classRepository.findSessionsByClassId(classId);
+            List<Map<String, Object>> sessions = new ArrayList<>();
+
+            for (QueryDocumentSnapshot doc : docs) {
+                sessions.add(doc.getData());
+            }
+            return sessions;
+        }, "Lỗi hệ thống khi lấy lịch trình lớp học");
+    }
     @Override
     public Map<String, Object> getAllClasses(int page, int size, String name, String program, String status, String startDate, String endDate) {
         return executeWithCatch(() -> {
@@ -221,8 +272,15 @@ public class ClassServiceImpl implements IClassService {
                         }
                         return true;
                     })
-                    // Thêm sắp xếp nếu muốn (VD: mới nhất lên đầu)
-                    .sorted((c1, c2) -> c2.getCreateDate().compareTo(c1.getCreateDate()))
+                    .sorted((c1, c2) -> {
+                        int dateCompare = c2.getCreateDate().compareTo(c1.getCreateDate());
+                        if (dateCompare == 0) {
+                            if (c1.getId() != null && c2.getId() != null) {
+                                return c1.getId().compareTo(c2.getId());
+                            }
+                        }
+                        return dateCompare;
+                    })
                     .collect(Collectors.toList());
 
             // 5. Phân trang thủ công trên list đã lọc

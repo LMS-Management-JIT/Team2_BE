@@ -171,6 +171,45 @@ public class ClassRepository {
         }
     }
 
+    // HÀM LƯU HÀNG LOẠT BUỔI HỌC VÀO SUBCOLLECTION
+    public void saveClassSessionsBatch(String classId, List<Map<String, Object>> sessionsData) throws ExecutionException, InterruptedException {
+        WriteBatch batch = firestore.batch();
+
+        // Trỏ vào Subcollection: classes/{classId}/class_sessions
+        CollectionReference sessionsRef = firestore.collection("classes").document(classId).collection("class_sessions");
+
+        for (Map<String, Object> session : sessionsData) {
+            DocumentReference docRef = sessionsRef.document();
+            session.put("id", docRef.getId()); // ID của document con
+            // Vẫn nên giữ lại class_id bên trong data để tiện truy vấn chéo sau này (Collection Group)
+            batch.set(docRef, session);
+        }
+
+        batch.commit().get();
+    }
+
+    // HÀM LẤY LỊCH TRÌNH TỪ SUBCOLLECTION
+    public List<QueryDocumentSnapshot> findSessionsByClassId(String classId) throws Exception {
+        return firestore.collection("classes").document(classId).collection("class_sessions")
+                .whereEqualTo("deleted", false)
+                .orderBy("session_date", Query.Direction.ASCENDING)
+                .get().get().getDocuments();
+    }
+
+    public List<ClassEntity> findAllByIds(List<String> ids) throws ExecutionException, InterruptedException {
+        List<ClassEntity> result = new ArrayList<>();
+        if (ids == null || ids.isEmpty()) return result;
+
+        // Xử lý vòng lặp để lấy chi tiết từng class dựa trên ID
+        for (String id : ids) {
+            ClassEntity entity = findById(id);
+            if (entity != null && !entity.isDeleted()) {
+                result.add(entity);
+            }
+        }
+        return result;
+    }
+
     public long countActive() throws Exception {
         return getClassCollection()
                 .whereEqualTo("deleted", false)
