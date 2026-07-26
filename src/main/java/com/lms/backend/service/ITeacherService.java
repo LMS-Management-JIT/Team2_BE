@@ -1,7 +1,9 @@
 package com.lms.backend.service;
 
 import com.lms.backend.dto.request.AttendanceRequest;
+import com.lms.backend.dto.request.ClassNotificationRequest;
 import com.lms.backend.dto.request.TeacherRequest;
+import com.lms.backend.dto.response.ClassStudentOptionResponse;
 import com.lms.backend.dto.response.TeacherResponse;
 import com.lms.backend.dto.response.TeacherScheduleResponse;
 import com.lms.backend.dto.response.TeacherStatsResponse;
@@ -53,4 +55,6 @@ public interface ITeacherService {
     Map<String, Object> getSessionAttendance(String classId, String sessionId);
     String saveSessionAttendance(String classId, String sessionId, List<AttendanceRequest> records);
 
+    List<ClassStudentOptionResponse> getClassStudents(String classId);
+    String sendClassNotification(String classId, ClassNotificationRequest request);
 }
