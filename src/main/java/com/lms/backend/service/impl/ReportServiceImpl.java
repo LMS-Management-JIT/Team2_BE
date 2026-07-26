@@ -354,7 +354,6 @@ public class ReportServiceImpl implements IReportService {
 
                 List<TopicLessonEntity> topicLessons = topicLessonRepository.findByTopicId(topicId);
                 for (TopicLessonEntity tl : topicLessons) {
-                    if (Boolean.TRUE.equals(tl.getDeleted())) continue;
                     if (tl.getLessonId() != null && !tl.getLessonId().isBlank()) {
                         lessonIds.add(tl.getLessonId());
                     }

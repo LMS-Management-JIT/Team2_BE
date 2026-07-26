@@ -5,11 +5,12 @@ import com.lms.backend.dto.request.AddLessonToTopicRequest;
 import com.lms.backend.dto.request.ReorderLessonsRequest;
 import com.lms.backend.dto.response.PagedResponse;
 import com.lms.backend.dto.response.TopicLessonResponse;
+import com.lms.backend.entity.LessonEntity;
 import com.lms.backend.entity.TopicLessonEntity;
 import com.lms.backend.exception.ResourceNotFoundException;
 import com.lms.backend.mapper.TopicLessonMapper;
+import com.lms.backend.repository.LessonRepository;
 import com.lms.backend.repository.TopicLessonRepository;
-import com.lms.backend.repository.TopicRepository;
 import com.lms.backend.service.ILessonService;
 import com.lms.backend.service.ITopicLessonService;
 import com.lms.backend.service.ITopicService;
@@ -18,8 +19,12 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -29,7 +34,7 @@ public class TopicLessonServiceImpl implements ITopicLessonService {
 
     private final TopicLessonRepository repository;
     private final TopicLessonMapper mapper;
-    private final TopicRepository topicRepository;
+    private final LessonRepository lessonRepository;
     private final ITopicService topicService;
     private final ILessonService lessonService;
     private final Firestore firestore;
@@ -107,7 +112,7 @@ public class TopicLessonServiceImpl implements ITopicLessonService {
                 .collect(Collectors.toList());
     }
 
-    @Override
+    /*@Override
     public PagedResponse<TopicLessonResponse> getAllLessonByTopic(int page, int size, String topicId) {
         List<TopicLessonEntity> entities = repository.findAllByTopicAndFilters(topicId, page, size);
 
@@ -133,7 +138,7 @@ public class TopicLessonServiceImpl implements ITopicLessonService {
                 .hasNext(hasNext)
                 .hasPrevious(page > 0)
                 .build();
-    }
+    }*/
 
     @Override
     public void reorderLessons(ReorderLessonsRequest request) throws ExecutionException, InterruptedException {
@@ -167,5 +172,76 @@ public class TopicLessonServiceImpl implements ITopicLessonService {
         TopicLessonEntity entity = repository.findByTopicIdAndLessonId(topicId, lessonId)
                 .orElseThrow(() -> new ResourceNotFoundException("Mapping not found"));
         return mapper.toResponse(entity);
+    }
+    @Override
+    public PagedResponse<TopicLessonResponse> getAllLessonByTopic(int page, int size, String topicId) {
+
+        // 1. Get topic_lessons mappings
+        List<TopicLessonEntity> mappings = repository.findAllByTopicAndFilters(topicId, page, size);
+
+        boolean hasNext = mappings.size() > size;
+        if (hasNext) {
+            mappings = mappings.subList(0, size);
+        }
+
+        if (mappings.isEmpty()) {
+            return PagedResponse.<TopicLessonResponse>builder()
+                    .content(Collections.emptyList())
+                    .page(page)
+                    .size(size)
+                    .totalElements(0)
+                    .totalPages(0)
+                    .hasNext(false)
+                    .hasPrevious(false)
+                    .build();
+        }
+
+        // 2. Collect lessonIds
+        List<String> lessonIds = mappings.stream()
+                .map(TopicLessonEntity::getLessonId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        // 3. Query Lessons by IDs
+        Map<String, LessonEntity> lessonMap = lessonRepository.findByIds(lessonIds)
+                .stream()
+                .collect(Collectors.toMap(LessonEntity::getId, Function.identity()));
+
+        // 4. Join data
+        List<TopicLessonResponse> responses = mappings.stream()
+                .map(mapping -> {
+                    LessonEntity lesson = lessonMap.get(mapping.getLessonId());
+
+                    return TopicLessonResponse.builder()
+                            .id(mapping.getId())
+                            .topicId(mapping.getTopicId())
+                            .lessonId(mapping.getLessonId())
+                            .lessonOrder(mapping.getLessonOrder())
+                            .createdBy(mapping.getCreatedBy())
+                            .updatedBy(mapping.getUpdatedBy())
+                            .createdAt(mapping.getCreatedAt())
+                            .updatedAt(mapping.getUpdatedAt())
+                            // Extra fields from Lesson
+                            .lessonName(lesson != null ? lesson.getLessonName() : null)
+                            .duration(lesson != null ? lesson.getDuration() : null)
+                            .type(lesson != null ? lesson.getType() : null)
+                            .published(lesson != null ? lesson.getPublished() : null)
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        long totalElements = repository.countByTopicId(topicId);
+        int totalPages = size > 0 ? (int) Math.ceil((double) totalElements / size) : 0;
+
+        return PagedResponse.<TopicLessonResponse>builder()
+                .content(responses)
+                .page(page)
+                .size(size)
+                .totalElements(totalElements)
+                .totalPages(totalPages)
+                .hasNext(hasNext)
+                .hasPrevious(page > 0)
+                .build();
     }
 }
