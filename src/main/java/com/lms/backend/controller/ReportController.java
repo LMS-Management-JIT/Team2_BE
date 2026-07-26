@@ -12,7 +12,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
-import java.time.YearMonth;
 
 @RestController
 @RequestMapping("/api/reports")
@@ -36,8 +35,12 @@ public class ReportController {
 
     @GetMapping("/new-students")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public NewStudentReportResponse getNewStudentReport(@RequestParam @DateTimeFormat(pattern = "yyyy-MM") YearMonth month) {
-        return reportService.getNewStudentReport(month);
+    public NewStudentReportResponse getNewStudentReport(
+            @RequestParam(required = false) String periodType,
+            @RequestParam(required = false) String current,
+            @RequestParam(required = false) String compareMode,
+            @RequestParam(required = false) String comparePeriod) {
+        return reportService.getNewStudentReport(periodType, current, compareMode, comparePeriod);
     }
 
     @GetMapping("/classes/{classId}/progress")

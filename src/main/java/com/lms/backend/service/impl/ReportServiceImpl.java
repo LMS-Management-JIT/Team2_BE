@@ -217,63 +217,147 @@ public class ReportServiceImpl implements IReportService {
     }
 
     // ================== CHART 2: HỌC SINH ĐĂNG KÝ MỚI (dữ liệu thật từ students.create_date) ==================
+    private static final Set<String> VALID_PERIOD_TYPE = Set.of("MONTH", "YEAR");
+    private static final Set<String> VALID_COMPARE_MODE = Set.of("PREVIOUS", "CUSTOM");
+    private static final DateTimeFormatter MONTH_LABEL = DateTimeFormatter.ofPattern("MM/yyyy");
+
     @Override
-    public NewStudentReportResponse getNewStudentReport(YearMonth month) {
+    public NewStudentReportResponse getNewStudentReport(
+            String periodType, String current, String compareMode, String comparePeriod) {
+        String normalizedPeriodType = periodType == null || periodType.isBlank()
+                ? "MONTH" : periodType.trim().toUpperCase();
+        if (!VALID_PERIOD_TYPE.contains(normalizedPeriodType)) {
+            throw new BadRequestException("periodType chỉ chấp nhận: MONTH, YEAR");
+        }
+
+        String normalizedCompareMode = compareMode == null || compareMode.isBlank()
+                ? "PREVIOUS" : compareMode.trim().toUpperCase();
+        if (!VALID_COMPARE_MODE.contains(normalizedCompareMode)) {
+            throw new BadRequestException("compareMode chỉ chấp nhận: PREVIOUS, CUSTOM");
+        }
+        if ("CUSTOM".equals(normalizedCompareMode) && (comparePeriod == null || comparePeriod.isBlank())) {
+            throw new BadRequestException("comparePeriod không được để trống khi compareMode = CUSTOM");
+        }
+
         try {
             List<StudentEntity> allStudents = studentRepository.findAllActive();
 
-            LocalDate firstDay = month.atDay(1);
-            LocalDate lastDay = month.atEndOfMonth();
+            if ("YEAR".equals(normalizedPeriodType)) {
+                int currentYear = current == null || current.isBlank()
+                        ? LocalDate.now().getYear() : Integer.parseInt(current.trim());
+                int compareYear = "CUSTOM".equals(normalizedCompareMode)
+                        ? Integer.parseInt(comparePeriod.trim())
+                        : currentYear - 1;
 
-            List<NewStudentReportResponse.WeekCount> weeks = new ArrayList<>();
-            LocalDate weekStart = firstDay;
-            int weekIndex = 1;
-            int total = 0;
-
-            while (!weekStart.isAfter(lastDay)) {
-                LocalDate weekEnd = weekStart.plusDays(6);
-                if (weekEnd.isAfter(lastDay)) {
-                    weekEnd = lastDay;
+                if (compareYear >= currentYear) {
+                    throw new BadRequestException("comparePeriod phải là năm trước năm hiện tại");
                 }
 
-                LocalDate finalWeekStart = weekStart;
-                LocalDate finalWeekEnd = weekEnd;
-                int count = (int) allStudents.stream()
-                        .filter(s -> s.getCreateDate() != null)
-                        .filter(s -> {
-                            LocalDate created = s.getCreateDate().toLocalDate();
-                            return !created.isBefore(finalWeekStart) && !created.isAfter(finalWeekEnd);
-                        })
-                        .count();
+                List<NewStudentReportResponse.BucketCount> currentBuckets = buildYearBuckets(allStudents, currentYear);
+                List<NewStudentReportResponse.BucketCount> compareBuckets = buildYearBuckets(allStudents, compareYear);
 
-                weeks.add(NewStudentReportResponse.WeekCount.builder()
-                        .weekLabel("Tuần " + weekIndex)
-                        .count(count)
-                        .build());
+                int currentTotal = currentBuckets.stream().mapToInt(NewStudentReportResponse.BucketCount::getCount).sum();
+                int compareTotal = compareBuckets.stream().mapToInt(NewStudentReportResponse.BucketCount::getCount).sum();
 
-                total += count;
-                weekStart = weekStart.plusDays(7);
-                weekIndex++;
+                return NewStudentReportResponse.builder()
+                        .periodType(normalizedPeriodType)
+                        .currentLabel(String.valueOf(currentYear))
+                        .compareLabel(String.valueOf(compareYear))
+                        .currentBuckets(currentBuckets)
+                        .compareBuckets(compareBuckets)
+                        .currentTotal(currentTotal)
+                        .compareTotal(compareTotal)
+                        .growthPercent(growthPercent(currentTotal, compareTotal))
+                        .build();
             }
 
-            YearMonth lastYearMonth = month.minusYears(1);
-            long lastYearCount = allStudents.stream()
-                    .filter(s -> s.getCreateDate() != null)
-                    .filter(s -> YearMonth.from(s.getCreateDate()).equals(lastYearMonth))
-                    .count();
+            YearMonth currentMonth = current == null || current.isBlank()
+                    ? YearMonth.now() : YearMonth.parse(current.trim());
+            YearMonth compareYearMonth = "CUSTOM".equals(normalizedCompareMode)
+                    ? YearMonth.parse(comparePeriod.trim())
+                    : currentMonth.minusMonths(1);
 
-            double growth = lastYearCount == 0
-                    ? (total > 0 ? 100.0 : 0.0)
-                    : round1(((double) (total - lastYearCount) / lastYearCount) * 100);
+            if (!compareYearMonth.isBefore(currentMonth)) {
+                throw new BadRequestException("comparePeriod phải là tháng trước tháng hiện tại");
+            }
+
+            List<NewStudentReportResponse.BucketCount> currentBuckets = buildMonthWeekBuckets(allStudents, currentMonth);
+            List<NewStudentReportResponse.BucketCount> compareBuckets = buildMonthWeekBuckets(allStudents, compareYearMonth);
+
+            int currentTotal = currentBuckets.stream().mapToInt(NewStudentReportResponse.BucketCount::getCount).sum();
+            int compareTotal = compareBuckets.stream().mapToInt(NewStudentReportResponse.BucketCount::getCount).sum();
 
             return NewStudentReportResponse.builder()
-                    .weeks(weeks)
-                    .total(total)
-                    .growthComparedLastYearPercent(growth)
+                    .periodType(normalizedPeriodType)
+                    .currentLabel(currentMonth.format(MONTH_LABEL))
+                    .compareLabel(compareYearMonth.format(MONTH_LABEL))
+                    .currentBuckets(currentBuckets)
+                    .compareBuckets(compareBuckets)
+                    .currentTotal(currentTotal)
+                    .compareTotal(compareTotal)
+                    .growthPercent(growthPercent(currentTotal, compareTotal))
                     .build();
+        } catch (BadRequestException e) {
+            throw e;
         } catch (Exception e) {
             throw new RuntimeException("Lỗi hệ thống khi lấy báo cáo học sinh đăng ký mới: " + e.getMessage(), e);
         }
+    }
+
+    private List<NewStudentReportResponse.BucketCount> buildMonthWeekBuckets(List<StudentEntity> allStudents, YearMonth month) {
+        List<NewStudentReportResponse.BucketCount> weeks = new ArrayList<>();
+        LocalDate firstDay = month.atDay(1);
+        LocalDate lastDay = month.atEndOfMonth();
+
+        LocalDate weekStart = firstDay;
+        int weekIndex = 1;
+        while (!weekStart.isAfter(lastDay)) {
+            LocalDate weekEnd = weekStart.plusDays(6);
+            if (weekEnd.isAfter(lastDay)) {
+                weekEnd = lastDay;
+            }
+
+            LocalDate finalWeekStart = weekStart;
+            LocalDate finalWeekEnd = weekEnd;
+            int count = (int) allStudents.stream()
+                    .filter(s -> s.getCreateDate() != null)
+                    .filter(s -> {
+                        LocalDate created = s.getCreateDate().toLocalDate();
+                        return !created.isBefore(finalWeekStart) && !created.isAfter(finalWeekEnd);
+                    })
+                    .count();
+
+            weeks.add(NewStudentReportResponse.BucketCount.builder()
+                    .bucketLabel("Tuần " + weekIndex)
+                    .count(count)
+                    .build());
+
+            weekStart = weekStart.plusDays(7);
+            weekIndex++;
+        }
+        return weeks;
+    }
+
+    private List<NewStudentReportResponse.BucketCount> buildYearBuckets(List<StudentEntity> allStudents, int year) {
+        List<NewStudentReportResponse.BucketCount> months = new ArrayList<>();
+        for (int m = 1; m <= 12; m++) {
+            YearMonth ym = YearMonth.of(year, m);
+            int count = (int) allStudents.stream()
+                    .filter(s -> s.getCreateDate() != null)
+                    .filter(s -> YearMonth.from(s.getCreateDate()).equals(ym))
+                    .count();
+            months.add(NewStudentReportResponse.BucketCount.builder()
+                    .bucketLabel("Tháng " + m)
+                    .count(count)
+                    .build());
+        }
+        return months;
+    }
+
+    private double growthPercent(int currentTotal, int compareTotal) {
+        return compareTotal == 0
+                ? (currentTotal > 0 ? 100.0 : 0.0)
+                : round1(((double) (currentTotal - compareTotal) / compareTotal) * 100);
     }
 
     // ================== CHART 3: TIẾN ĐỘ HOÀN THÀNH KHÓA HỌC (dữ liệu thật từ lesson_progress) ==================
@@ -493,7 +577,7 @@ public class ReportServiceImpl implements IReportService {
             classAbsences = getClassAbsenceReport(absenceClassId, from, to);
         }
 
-        NewStudentReportResponse newStudents = getNewStudentReport(ym);
+        NewStudentReportResponse newStudents = getNewStudentReport("MONTH", ym.toString(), "PREVIOUS", null);
 
         ClassProgressReportResponse classProgress = null;
         if (progressClassId != null && !progressClassId.isBlank()) {

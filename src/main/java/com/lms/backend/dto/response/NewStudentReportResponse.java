@@ -12,16 +12,21 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class NewStudentReportResponse {
-    private List<WeekCount> weeks;
-    private int total;
-    private double growthComparedLastYearPercent;
+    private String periodType;
+    private String currentLabel;
+    private String compareLabel;
+    private List<BucketCount> currentBuckets;
+    private List<BucketCount> compareBuckets;
+    private int currentTotal;
+    private int compareTotal;
+    private double growthPercent;
 
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class WeekCount {
-        private String weekLabel;
+    public static class BucketCount {
+        private String bucketLabel;
         private int count;
     }
 }
