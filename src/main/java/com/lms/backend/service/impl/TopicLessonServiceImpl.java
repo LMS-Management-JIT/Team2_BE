@@ -11,6 +11,7 @@ import com.lms.backend.exception.ResourceNotFoundException;
 import com.lms.backend.mapper.TopicLessonMapper;
 import com.lms.backend.repository.LessonRepository;
 import com.lms.backend.repository.TopicLessonRepository;
+import com.lms.backend.repository.TopicRepository;
 import com.lms.backend.service.ILessonService;
 import com.lms.backend.service.ITopicLessonService;
 import com.lms.backend.service.ITopicService;
@@ -37,6 +38,7 @@ public class TopicLessonServiceImpl implements ITopicLessonService {
     private final LessonRepository lessonRepository;
     private final ITopicService topicService;
     private final ILessonService lessonService;
+    private final TopicRepository topicRepository;
     private final Firestore firestore;
 
     @Override
@@ -112,56 +114,31 @@ public class TopicLessonServiceImpl implements ITopicLessonService {
                 .collect(Collectors.toList());
     }
 
-    /*@Override
-    public PagedResponse<TopicLessonResponse> getAllLessonByTopic(int page, int size, String topicId) {
-        List<TopicLessonEntity> entities = repository.findAllByTopicAndFilters(topicId, page, size);
-
-        boolean hasNext = entities.size() > size;
-        if (hasNext) {
-            entities = entities.subList(0, size);
-        }
-
-        List<TopicLessonResponse> responses = entities.stream()
-                .map(mapper::toResponse)
-                .collect(Collectors.toList());
-
-        long total = repository.countByTopicId(topicId);
-
-        int totalPages = size > 0 ? (int) Math.ceil((double) total / size) : 0;
-
-        return PagedResponse.<TopicLessonResponse>builder()
-                .content(responses)
-                .page(page)
-                .size(size)
-                .totalElements(total)
-                .totalPages(totalPages)
-                .hasNext(hasNext)
-                .hasPrevious(page > 0)
-                .build();
-    }*/
 
     @Override
     public void reorderLessons(ReorderLessonsRequest request) throws ExecutionException, InterruptedException {
-        if (!topicService.existsById(request.getTopicId())) {
-            throw new ResourceNotFoundException("Topic not found: " + request.getTopicId());
-        }
-
+        String topicId = request.getTopicId();
         List<String> lessonIds = request.getLessonIds();
+
         if (lessonIds == null || lessonIds.isEmpty()) {
             return;
         }
 
-        firestore.runTransaction(tx -> {
-            for (int i = 0; i < lessonIds.size(); i++) {
-                String lessonId = lessonIds.get(i);
-                TopicLessonEntity entity = repository.findByTopicIdAndLessonId(request.getTopicId(), lessonId)
-                        .orElseThrow(() -> new ResourceNotFoundException("Lesson not in topic: " + lessonId));
-                repository.updateLessonOrder(entity.getId(), i + 1);
-            }
-            return null;
-        });
-    }
+        // Validate topic exists
+        if (topicRepository.findActiveById(topicId) == null) {
+            throw new ResourceNotFoundException("Topic not found");
+        }
 
+        // Update order
+        for (int i = 0; i < lessonIds.size(); i++) {
+            String lessonId = lessonIds.get(i);
+            TopicLessonEntity mapping = repository.findByTopicIdAndLessonId(topicId, lessonId)
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Lesson not found in topic: " + lessonId));
+
+            repository.updateLessonOrder(mapping.getId(), i + 1);
+        }
+    }
     @Override
     public boolean exists(String topicId, String lessonId) {
         return repository.exists(topicId, lessonId);
