@@ -4,7 +4,10 @@ firebase:
 jwt:
   secret: ${JWT_SECRET:VGhpcyBpcyBhIHZlcnkgc2VjdXJlIHNlY3JldCBrZXkgZm9yIEpXVA}
   expiration: ${JWT_EXPIRATION:36000000}
+
 server:
-  port : ${PORT:1010}
+  port: ${PORT:1010}
 
-
+onesignal:
+  app-id: ${ONESIGNAL_APP_ID:919a378c-ae46-4a1d-b781-f646ee5133fb}
+  api-key: ${ONESIGNAL_REST_API_KEY:os_v2_app_sgndpdfoizfb3n4b6zdo4ujt7oyxcmigflfem2fsz2sjhmqeimahpsk7t4mcqoovfnvrgyu5lorfm37uewjf3xl4s5otl4557qdhvli}
