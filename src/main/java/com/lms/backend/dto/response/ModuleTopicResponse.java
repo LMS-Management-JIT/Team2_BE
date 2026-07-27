@@ -19,6 +19,8 @@ public class ModuleTopicResponse {
 
     private String topicId;
 
+    private String topicName;
+
     private Integer topicOrder;
 
     private Boolean deleted;

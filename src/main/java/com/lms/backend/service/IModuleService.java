@@ -5,6 +5,7 @@ import com.lms.backend.dto.request.ModuleRequest;
 import com.lms.backend.dto.response.ModuleResponse;
 
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 public interface IModuleService {
     long countModules();
@@ -15,4 +16,5 @@ public interface IModuleService {
     ModuleResponse getModuleById(String id);
     String updateModule(String id, ModuleRequest request);
     String deleteModule(String id, String deletedBy);
+    boolean existsById(String moduleId) throws ExecutionException, InterruptedException;
 }
