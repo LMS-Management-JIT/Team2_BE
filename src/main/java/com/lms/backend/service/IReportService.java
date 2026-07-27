@@ -7,13 +7,17 @@ import com.lms.backend.dto.response.NewStudentReportResponse;
 import com.lms.backend.dto.response.ReportDashboardResponse;
 
 import java.time.LocalDate;
-import java.time.YearMonth;
 
 public interface IReportService {
 
     AbsenceRateReportResponse getAbsenceRateReport(LocalDate from, LocalDate to, String groupBy);
 
-    NewStudentReportResponse getNewStudentReport(YearMonth month);
+    NewStudentReportResponse getNewStudentReport(
+            String periodType,
+            String current,
+            String compareMode,
+            String comparePeriod
+    );
 
     ClassProgressReportResponse getClassProgressReport(String classId);
 
