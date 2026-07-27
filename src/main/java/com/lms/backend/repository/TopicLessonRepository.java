@@ -8,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -32,7 +31,7 @@ public class TopicLessonRepository {
         try {
             Query query = firestore.collection("topic_lessons");
 
-             if (StringUtils.hasText(topicId)) {
+            if (StringUtils.hasText(topicId)) {
                 query = query.whereEqualTo("topic_id", topicId);
             }
 
@@ -41,8 +40,6 @@ public class TopicLessonRepository {
             throw new RuntimeException("Failed to count TopicLesson", e);
         }
     }
-
-
 
 
     //Find By ID
@@ -57,36 +54,30 @@ public class TopicLessonRepository {
         return null;
     }
 
-
-
+    public void updateLessonOrder(String id, Integer newOrder) {
+        try {
+            firestore.collection("topic_lessons")
+                    .document(id)
+                    .update("lesson_order", newOrder)
+                    .get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException("Failed to update lesson order", e);
+        }
+    }
 
     public Optional<TopicLessonEntity> findByTopicIdAndLessonId(String topicId, String lessonId) {
         try {
-            Query query = firestore.collection(COLLECTION_NAME)
+            Query query = firestore.collection("topic_lessons")
                     .whereEqualTo("topic_id", topicId)
                     .whereEqualTo("lesson_id", lessonId)
                     .limit(1);
 
-            List<QueryDocumentSnapshot> documents = query.get().get().getDocuments();
-            if (documents.isEmpty()) {
-                return Optional.empty();
-            }
-            return Optional.of(topicLessonMapper.fromDocument(documents.get(0)));
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException("Cannot find by topic and lesson", e);
-        }
-    }
+            List<QueryDocumentSnapshot> docs = query.get().get().getDocuments();
+            if (docs.isEmpty()) return Optional.empty();
 
-
-
-    public void updateLessonOrder(String id, Integer newOrder) {
-        try {
-            firestore.collection(COLLECTION_NAME)
-                    .document(id)
-                    .update("lesson_order", newOrder, "updatedAt", Instant.now())
-                    .get();
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException("Cannot update lesson order", e);
+            return Optional.of(topicLessonMapper.fromDocument(docs.get(0)));
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to find mapping", e);
         }
     }
 
@@ -125,47 +116,46 @@ public class TopicLessonRepository {
     }
 
 
-
-        public TopicLessonEntity save(TopicLessonEntity entity) {
-            try {
-                DocumentReference ref;
-                if (entity.getId() == null || entity.getId().isEmpty()) {
-                    ref = firestore.collection(COLLECTION_NAME).document();
-                    entity.setId(ref.getId());
-                } else {
-                    ref = firestore.collection(COLLECTION_NAME).document(entity.getId());
-                }
-
-                ref.set(topicLessonMapper.toFirestoreMap(entity)).get(); // Use mapper if needed
-                return entity;
-            } catch (InterruptedException | ExecutionException e) {
-                throw new RuntimeException("Cannot save topic lesson", e);
+    public TopicLessonEntity save(TopicLessonEntity entity) {
+        try {
+            DocumentReference ref;
+            if (entity.getId() == null || entity.getId().isEmpty()) {
+                ref = firestore.collection(COLLECTION_NAME).document();
+                entity.setId(ref.getId());
+            } else {
+                ref = firestore.collection(COLLECTION_NAME).document(entity.getId());
             }
-        }
 
-        public void delete(String id) {
-            try {
-                firestore.collection(COLLECTION_NAME).document(id).delete().get();
-            } catch (InterruptedException | ExecutionException e) {
-                throw new RuntimeException("Cannot delete topic lesson", e);
+            ref.set(topicLessonMapper.toFirestoreMap(entity)).get(); // Use mapper if needed
+            return entity;
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException("Cannot save topic lesson", e);
+        }
+    }
+
+    public void delete(String id) {
+        try {
+            firestore.collection(COLLECTION_NAME).document(id).delete().get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException("Cannot delete topic lesson", e);
+        }
+    }
+
+    public List<TopicLessonEntity> findByTopicId(String topicId) {
+        try {
+            Query query = firestore.collection(COLLECTION_NAME)
+                    .whereEqualTo("topic_id", topicId)
+                    .orderBy("lesson_order", Query.Direction.ASCENDING);
+
+            List<TopicLessonEntity> list = new ArrayList<>();
+            for (DocumentSnapshot doc : query.get().get().getDocuments()) {
+                list.add(topicLessonMapper.fromDocument(doc));
             }
+            return list;
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException("Cannot find by topic id", e);
         }
-
-        public List<TopicLessonEntity> findByTopicId(String topicId) {
-            try {
-                Query query = firestore.collection(COLLECTION_NAME)
-                        .whereEqualTo("topic_id", topicId)
-                        .orderBy("lesson_order", Query.Direction.ASCENDING);
-
-                List<TopicLessonEntity> list = new ArrayList<>();
-                for (DocumentSnapshot doc : query.get().get().getDocuments()) {
-                    list.add(topicLessonMapper.fromDocument(doc));
-                }
-                return list;
-            } catch (InterruptedException | ExecutionException e) {
-                throw new RuntimeException("Cannot find by topic id", e);
-            }
-        }
+    }
 
     public List<TopicLessonEntity> findAllByTopicAndFilters(String topicId, int page, int size) {
         try {
@@ -195,28 +185,28 @@ public class TopicLessonRepository {
         }
     }
 
-        public long countByTopicId(String topicId) {
-            try {
-                Query query = firestore.collection(COLLECTION_NAME);
-                if (StringUtils.hasText(topicId)) {
-                    query = query.whereEqualTo("topic_id", topicId);
-                }
-                return query.get().get().size();
-            } catch (InterruptedException | ExecutionException e) {
-                throw new RuntimeException("Failed to count TopicLesson", e);
+    public long countByTopicId(String topicId) {
+        try {
+            Query query = firestore.collection(COLLECTION_NAME);
+            if (StringUtils.hasText(topicId)) {
+                query = query.whereEqualTo("topic_id", topicId);
             }
+            return query.get().get().size();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException("Failed to count TopicLesson", e);
         }
+    }
 
-        // Helper methods
-        public boolean exists(String topicId, String lessonId) {
-            try {
-                Query query = firestore.collection(COLLECTION_NAME)
-                        .whereEqualTo("topic_id", topicId)
-                        .whereEqualTo("lesson_id", lessonId)
-                        .limit(1);
-                return !query.get().get().isEmpty();
-            } catch (InterruptedException | ExecutionException e) {
-                throw new RuntimeException("Cannot check existence", e);
-            }
+    // Helper methods
+    public boolean exists(String topicId, String lessonId) {
+        try {
+            Query query = firestore.collection(COLLECTION_NAME)
+                    .whereEqualTo("topic_id", topicId)
+                    .whereEqualTo("lesson_id", lessonId)
+                    .limit(1);
+            return !query.get().get().isEmpty();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException("Cannot check existence", e);
         }
+    }
 }
