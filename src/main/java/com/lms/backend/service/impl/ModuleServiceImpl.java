@@ -118,6 +118,13 @@ public class ModuleServiceImpl implements IModuleService {
 
     @Override
     @SneakyThrows
+    public boolean existsById(String moduleId) {
+        ModuleEntity entity = moduleRepository.findById(moduleId);
+        return entity != null && !entity.isDeleted();
+    }
+
+    @Override
+    @SneakyThrows
     public String deleteModule(String id, String deletedBy) {
         ModuleEntity existingEntity = moduleRepository.findById(id);
         if (existingEntity == null) {

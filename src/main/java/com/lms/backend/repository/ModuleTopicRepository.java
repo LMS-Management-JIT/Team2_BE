@@ -142,4 +142,55 @@ public class ModuleTopicRepository {
             throw new RuntimeException("Cannot find by topic id", e);
         }
     }
+
+    // FIND BY MODULE ID + TOPIC ID
+    public java.util.Optional<ModuleTopicEntity> findByModuleIdAndTopicId(String moduleId, String topicId) {
+        try {
+            Query query = firestore()
+                    .collection(COLLECTION_NAME)
+                    .whereEqualTo("module_id", moduleId)
+                    .whereEqualTo("topic_id", topicId)
+                    .limit(1);
+
+            List<QueryDocumentSnapshot> docs = query.get().get().getDocuments();
+            if (docs.isEmpty()) return java.util.Optional.empty();
+
+            return java.util.Optional.of(moduleTopicMapper.fromDocument(docs.get(0)));
+
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException("Cannot find by module id and topic id", e);
+        }
+    }
+
+    // CHECK EXISTS
+    public boolean exists(String moduleId, String topicId) {
+        return findByModuleIdAndTopicId(moduleId, topicId).isPresent();
+    }
+
+    // COUNT BY MODULE ID
+    public long countByModuleId(String moduleId) {
+        try {
+            Query query = firestore()
+                    .collection(COLLECTION_NAME)
+                    .whereEqualTo("module_id", moduleId);
+
+            return query.get().get().size();
+
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException("Cannot count by module id", e);
+        }
+    }
+
+    // UPDATE TOPIC ORDER
+    public void updateTopicOrder(String id, Integer newOrder) {
+        try {
+            firestore()
+                    .collection(COLLECTION_NAME)
+                    .document(id)
+                    .update("topic_order", newOrder)
+                    .get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException("Failed to update topic order", e);
+        }
+    }
 }

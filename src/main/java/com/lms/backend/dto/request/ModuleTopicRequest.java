@@ -22,7 +22,6 @@ public class ModuleTopicRequest {
     @NotBlank(message = "Topic ID is required")
     private String topicId;
 
-    @NotNull(message = "Topic order is required")
-    @Min(value = 1, message = "Topic order must be greater than 0")
+
     private Integer topicOrder;
 }
