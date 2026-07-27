@@ -20,10 +20,6 @@ public class LessonRequest {
     @Size(max = 255, message = "Lesson name must not exceed 255 characters")
     private String lessonName;
 
-    @NotNull(message = "Lesson order is required")
-    @Min(value = 1, message = "Lesson order must be greater than 0")
-    private Integer lessonOrder;
-
     @NotNull(message = "Published status is required")
     private Boolean published;
 
