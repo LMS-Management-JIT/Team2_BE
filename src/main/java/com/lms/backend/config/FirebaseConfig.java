@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 
@@ -33,7 +34,9 @@ public class FirebaseConfig {
     public Firestore firestore() throws IOException {
         Resource serviceAccountResource = resourceLoader.getResource(serviceAccountPath);
 
-        try (InputStream serviceAccount = serviceAccountResource.getInputStream()) {
+        try (InputStream serviceAccount =
+                     new ClassPathResource("firebase-service-account.json")
+                             .getInputStream();) {
             FirebaseOptions options = FirebaseOptions.builder()
                     .setCredentials(GoogleCredentials.fromStream(serviceAccount))
                     .build();
