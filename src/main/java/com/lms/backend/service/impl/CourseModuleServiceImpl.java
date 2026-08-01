@@ -178,7 +178,7 @@ public class CourseModuleServiceImpl implements ICourseModuleService {
         String savedId = repository.save(entity);
         CourseModuleEntity saved = repository.findById(savedId)
                 .orElseThrow(() -> new NoSuchElementException("Lỗi khi lấy lại dữ liệu!"));
-        return mapper.toResponse(saved);
+        return toResponseWithModuleName(saved);
     }
 
     // ========================================================================
@@ -210,9 +210,31 @@ public class CourseModuleServiceImpl implements ICourseModuleService {
     @Override
     @SneakyThrows
     public List<CourseModuleResponse> getByCourseId(String courseId) {
-        return repository.findByCourseId(courseId).stream()
-                .map(mapper::toResponse)
-                .collect(Collectors.toList());
+        List<CourseModuleResponse> responses = new ArrayList<>();
+        for (CourseModuleEntity mapping : repository.findByCourseId(courseId)) {
+            responses.add(toResponseWithModuleName(mapping));
+        }
+        return responses;
+    }
+
+    /**
+     * Map CourseModuleEntity -> CourseModuleResponse, đồng thời lấy thêm tên
+     * module (moduleName) từ bảng modules để trả về trong response.
+     */
+    @SneakyThrows
+    private CourseModuleResponse toResponseWithModuleName(CourseModuleEntity mapping) {
+        CourseModuleResponse response = mapper.toResponse(mapping);
+
+        String moduleId = mapping.getModuleId();
+        if (moduleId != null && !moduleId.isBlank()) {
+            ModuleEntity module = moduleRepository.findSmartByIdOrCode(moduleId);
+            if (module != null && !module.isDeleted()) {
+                response.setModuleName(module.getModuleName());
+            } else {
+                System.err.println("Cảnh báo: Không tìm thấy Module khớp với moduleId: " + moduleId);
+            }
+        }
+        return response;
     }
 
     // ========================================================================
