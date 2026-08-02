@@ -25,6 +25,9 @@ public class CourseModuleEntity {
     @PropertyName("module_id")
     private String moduleId;
 
+    @PropertyName("module_order")
+    private Integer moduleOrder;
+
     private Boolean deleted;
 
     @PropertyName("created_by")

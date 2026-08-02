@@ -5,6 +5,7 @@ import com.lms.backend.dto.response.CourseModuleResponse;
 import com.lms.backend.dto.response.ModuleResponse;
 import com.lms.backend.entity.CourseModuleEntity;
 import com.lms.backend.entity.ModuleEntity;
+import com.lms.backend.exception.ResourceNotFoundException;
 import com.lms.backend.mapper.CourseModuleMapper;
 import com.lms.backend.mapper.ModuleMapper;
 import com.lms.backend.repository.CourseModuleRepository;
@@ -21,6 +22,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 // ==========================================
@@ -135,5 +137,121 @@ public class CourseModuleServiceImpl implements ICourseModuleService {
             }
         }
         return responses;
+    }
+
+    // ========================================================================
+    // Thêm module vào course (giống pattern addTopicToModule bên ModuleTopic)
+    // ========================================================================
+    @Override
+    @SneakyThrows
+    public CourseModuleResponse addModuleToCourse(String courseId, String moduleId, String createdBy)
+            throws ExecutionException, InterruptedException {
+
+        // Kiểm tra module tồn tại
+        ModuleEntity module = moduleRepository.findSmartByIdOrCode(moduleId);
+        if (module == null || module.isDeleted()) {
+            throw new ResourceNotFoundException("Không tìm thấy module với ID: " + moduleId);
+        }
+
+        // Kiểm tra trùng lặp
+        if (repository.findByCourseIdAndModuleId(courseId, moduleId).isPresent()) {
+            throw new IllegalArgumentException("Module đã tồn tại trong khóa học này!");
+        }
+
+        // Auto-assign order
+        long count = repository.countByCourseId(courseId);
+        int nextOrder = (int) count + 1;
+
+        String currentUser = createdBy != null ? createdBy : getCurrentUserEmail();
+
+        CourseModuleEntity entity = CourseModuleEntity.builder()
+                .courseId(courseId)
+                .moduleId(moduleId)
+                .moduleOrder(nextOrder)
+                .deleted(false)
+                .createdBy(currentUser)
+                .updatedBy(currentUser)
+                .createDate(LocalDateTime.now())
+                .updateDate(LocalDateTime.now())
+                .build();
+
+        String savedId = repository.save(entity);
+        CourseModuleEntity saved = repository.findById(savedId)
+                .orElseThrow(() -> new NoSuchElementException("Lỗi khi lấy lại dữ liệu!"));
+        return toResponseWithModuleName(saved);
+    }
+
+    // ========================================================================
+    // Xóa module khỏi course (giống pattern removeTopicFromModule bên ModuleTopic)
+    // ========================================================================
+    @Override
+    @SneakyThrows
+    public void removeModuleFromCourse(String courseId, String moduleId, String updatedBy) {
+        CourseModuleEntity mapping = repository.findByCourseIdAndModuleId(courseId, moduleId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Không tìm thấy module trong khóa học! courseId: " + courseId + ", moduleId: " + moduleId));
+
+        String user = updatedBy != null ? updatedBy : getCurrentUserEmail();
+        repository.softDelete(mapping.getId(), user);
+
+        // Reorder remaining modules in the course
+        List<CourseModuleEntity> remaining = repository.findByCourseId(courseId);
+        for (int i = 0; i < remaining.size(); i++) {
+            CourseModuleEntity rel = remaining.get(i);
+            if (!rel.getId().equals(mapping.getId())) {
+                repository.updateModuleOrder(rel.getId(), i + 1);
+            }
+        }
+    }
+
+    // ========================================================================
+    // Lấy danh sách mapping entities theo courseId (giống getByModuleId bên ModuleTopic)
+    // ========================================================================
+    @Override
+    @SneakyThrows
+    public List<CourseModuleResponse> getByCourseId(String courseId) {
+        List<CourseModuleResponse> responses = new ArrayList<>();
+        for (CourseModuleEntity mapping : repository.findByCourseId(courseId)) {
+            responses.add(toResponseWithModuleName(mapping));
+        }
+        return responses;
+    }
+
+    /**
+     * Map CourseModuleEntity -> CourseModuleResponse, đồng thời lấy thêm tên
+     * module (moduleName) từ bảng modules để trả về trong response.
+     */
+    @SneakyThrows
+    private CourseModuleResponse toResponseWithModuleName(CourseModuleEntity mapping) {
+        CourseModuleResponse response = mapper.toResponse(mapping);
+
+        String moduleId = mapping.getModuleId();
+        if (moduleId != null && !moduleId.isBlank()) {
+            ModuleEntity module = moduleRepository.findSmartByIdOrCode(moduleId);
+            if (module != null && !module.isDeleted()) {
+                response.setModuleName(module.getModuleName());
+            } else {
+                System.err.println("Cảnh báo: Không tìm thấy Module khớp với moduleId: " + moduleId);
+            }
+        }
+        return response;
+    }
+
+    // ========================================================================
+    // Sắp xếp thứ tự module trong course
+    // ========================================================================
+    @Override
+    @SneakyThrows
+    public void reorderModules(String courseId, List<String> moduleIds, String updatedBy) {
+        if (moduleIds == null || moduleIds.isEmpty()) return;
+
+        for (int i = 0; i < moduleIds.size(); i++) {
+            String moduleId = moduleIds.get(i);
+            CourseModuleEntity mapping = repository.findByCourseIdAndModuleId(courseId, moduleId)
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Không tìm thấy module trong khóa học: " + moduleId));
+
+            repository.updateModuleOrder(mapping.getId(), i + 1);
+        }
     }
 }

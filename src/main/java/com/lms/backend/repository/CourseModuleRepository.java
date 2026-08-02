@@ -87,4 +87,40 @@ public class CourseModuleRepository {
         });
         return future.get();
     }
+
+    // ========== FIND BY COURSE ID + MODULE ID (giống bên ModuleTopicRepository) ==========
+    public java.util.Optional<CourseModuleEntity> findByCourseIdAndModuleId(String courseId, String moduleId)
+            throws ExecutionException, InterruptedException {
+        Query query = firestore.collection(COLLECTION_NAME)
+                .whereEqualTo("course_id", courseId)
+                .whereEqualTo("module_id", moduleId)
+                .whereEqualTo("deleted", false)
+                .limit(1);
+
+        List<QueryDocumentSnapshot> docs = query.get().get().getDocuments();
+        if (docs.isEmpty()) return java.util.Optional.empty();
+
+        return java.util.Optional.of(mapper.fromDocument(docs.get(0)));
+    }
+
+    // ========== COUNT BY COURSE ID ==========
+    public long countByCourseId(String courseId) throws ExecutionException, InterruptedException {
+        QuerySnapshot snapshot = firestore.collection(COLLECTION_NAME)
+                .whereEqualTo("course_id", courseId)
+                .whereEqualTo("deleted", false)
+                .get()
+                .get();
+        return snapshot.size();
+    }
+
+    // ========== UPDATE MODULE ORDER ==========
+    public void updateModuleOrder(String id, Integer newOrder) {
+        try {
+            firestore.collection(COLLECTION_NAME).document(id)
+                    .update("module_order", newOrder)
+                    .get();
+        } catch (ExecutionException | InterruptedException e) {
+            throw new RuntimeException("Failed to update module order", e);
+        }
+    }
 }

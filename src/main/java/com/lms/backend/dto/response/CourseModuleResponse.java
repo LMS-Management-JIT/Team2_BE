@@ -15,6 +15,8 @@ public class CourseModuleResponse {
     private String id;
     private String courseId;
     private String moduleId;
+    private String moduleName;
+    private Integer moduleOrder;
     private Boolean deleted;
     private String createdBy;
     private String updatedBy;
