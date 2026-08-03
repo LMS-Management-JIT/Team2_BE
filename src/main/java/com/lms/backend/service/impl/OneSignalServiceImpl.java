@@ -55,8 +55,10 @@ public class OneSignalServiceImpl implements IOneSignalService {
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
             restTemplate.postForEntity(ONESIGNAL_API_URL, entity, String.class);
         } catch (Exception e) {
-            // Không throw để tránh làm fail toàn bộ luồng nghiệp vụ chính (lưu điểm danh, gửi thông báo admin...)
-            System.err.println("Lỗi gửi OneSignal: " + e.getMessage());
+            throw new IllegalStateException(
+                    "Lỗi gửi OneSignal: " + e.getMessage(),
+                    e
+            );
         }
     }
 }

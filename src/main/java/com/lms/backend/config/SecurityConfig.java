@@ -48,6 +48,7 @@ public class SecurityConfig {
                                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized"))
                 )
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/login", "/api/auth/refresh").permitAll()
                         .requestMatchers("/api/auth/logout", "/api/modules/**","/api/classes/**","/api/auth/me","/api/dashboard/**","/api/students/**","/api/teachers/**", "/api/notifications/**").authenticated()
