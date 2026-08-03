@@ -7,6 +7,7 @@ import com.lms.backend.entity.NotificationEntity;
 import com.lms.backend.entity.ProfileEntity;
 import com.lms.backend.entity.RoleEntity;
 import com.lms.backend.exception.BadRequestException;
+import com.lms.backend.kafka.producer.NotificationKafkaProducer;
 import com.lms.backend.repository.AccountRepository;
 import com.lms.backend.repository.NotificationRepository;
 import com.lms.backend.repository.ProfileRepository;
@@ -33,7 +34,7 @@ public class NotificationServiceImpl implements INotificationService {
     private final AccountRepository accountRepository;
     private final RoleRepository roleRepository;
     private final NotificationRepository notificationRepository;
-    private final IOneSignalService oneSignalService;
+    private final NotificationKafkaProducer notificationKafkaProducer;
     private final ProfileRepository profileRepository;
 
     @Override
@@ -74,11 +75,15 @@ public class NotificationServiceImpl implements INotificationService {
             }
 
             // 3. Gửi push qua OneSignal (external_user_id = accountId)
-            oneSignalService.sendToExternalUserIds(
+            notificationKafkaProducer.publish(
+                    notificationId,
                     recipientAccountIds,
                     request.getTitle(),
                     request.getBody(),
-                    Map.of("type", "SYSTEM", "notification_id", notificationId)
+                    Map.of(
+                            "type", "SYSTEM",
+                            "notification_id", notificationId
+                    )
             );
 
             return "Đã gửi thông báo tới " + recipientAccountIds.size() + " người nhận.";

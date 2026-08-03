@@ -1,5 +1,5 @@
 firebase:
-  service-account-path: ${FIREBASE_SERVICE_ACCOUNT:classpath:firebase-service-account.json}
+  service-account-path: ${FIREBASE_SERVICE_ACCOUNT}
 
 jwt:
   secret: ${JWT_SECRET:VGhpcyBpcyBhIHZlcnkgc2VjdXJlIHNlY3JldCBrZXkgZm9yIEpXVA}
@@ -10,4 +10,29 @@ server:
 
 onesignal:
   app-id: ${ONESIGNAL_APP_ID:919a378c-ae46-4a1d-b781-f646ee5133fb}
-  api-key: ${ONESIGNAL_REST_API_KEY:os_v2_app_sgndpdfoizfb3n4b6zdo4ujt7oyxcmigflfem2fsz2sjhmqeimahpsk7t4mcqoovfnvrgyu5lorfm37uewjf3xl4s5otl4557qdhvli}
+  api-key: ${ONESIGNAL_REST_API_KEY}
+
+spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      properties:
+        "[spring.json.add.type.headers]": false
+
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP:lms-notification-service}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+      properties:
+        "[spring.json.use.type.headers]": false
+        "[spring.json.value.default.type]": com.lms.backend.kafka.event.PushNotificationEvent
+        "[spring.json.trusted.packages]": com.lms.backend.kafka.event
+
+app:
+  kafka:
+    topic:
+      notification-push: ${KAFKA_NOTIFICATION_TOPIC:lms-notification-push}

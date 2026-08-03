@@ -8,6 +8,7 @@ import com.lms.backend.dto.response.*;
 import com.lms.backend.entity.*;
 import com.lms.backend.exception.BadRequestException;
 import com.lms.backend.exception.ResourceNotFoundException;
+import com.lms.backend.kafka.producer.NotificationKafkaProducer;
 import com.lms.backend.mapper.TeacherClassMapper;
 import com.lms.backend.mapper.TeacherMapper;
 import com.lms.backend.repository.*;
@@ -54,7 +55,8 @@ public class TeacherServiceImpl implements ITeacherService {
     private final PasswordEncoder passwordEncoder;
     private final IHistoryService historyService;
 
-    private final IOneSignalService oneSignalService;
+    private final NotificationKafkaProducer notificationKafkaProducer;
+
     private final NotificationRepository notificationRepository;
 
     @Override
@@ -599,12 +601,23 @@ public class TeacherServiceImpl implements ITeacherService {
                     // Gửi OneSignal theo mảng (Batch)
                     statusToAccountsMap.forEach((status, accountIds) -> {
                         String notifTitle = "Thông báo điểm danh";
-                        String notifBody = String.format("Bạn được đánh dấu '%s' trong %s%s.", status, sessionTitle, dateDisplay);
-                        oneSignalService.sendToExternalUserIds(
+                        String notifBody = String.format(
+                                "Bạn được đánh dấu '%s' trong %s%s.",
+                                status,
+                                sessionTitle,
+                                dateDisplay
+                        );
+
+                        notificationKafkaProducer.publish(
+                                UUID.randomUUID().toString(),
                                 accountIds,
                                 notifTitle,
                                 notifBody,
-                                Map.of("type", "ATTENDANCE", "class_id", classId != null ? classId : "", "session_id", sessionId != null ? sessionId : "")
+                                Map.of(
+                                        "type", "ATTENDANCE",
+                                        "class_id", classId != null ? classId : "",
+                                        "session_id", sessionId != null ? sessionId : ""
+                                )
                         );
                     });
 
@@ -689,11 +702,17 @@ public class TeacherServiceImpl implements ITeacherService {
                 notificationRepository.pushToUserInbox(accountId, request.getTitle(), request.getContent(), request.getNote(), "CLASS", classId, null, notificationId);
             }
 
-            oneSignalService.sendToExternalUserIds(
+            notificationKafkaProducer.publish(
+                    notificationId,
                     accountIds,
                     request.getTitle(),
                     request.getContent(),
-                    Map.of("type", "CLASS", "class_id", classId, "category", request.getCategory() == null ? "" : request.getCategory())
+                    Map.of(
+                            "type", "CLASS",
+                            "class_id", classId,
+                            "category",
+                            request.getCategory() == null ? "" : request.getCategory()
+                    )
             );
 
             return "Đã gửi thông báo tới " + accountIds.size() + " học viên.";
