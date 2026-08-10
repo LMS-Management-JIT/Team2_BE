@@ -24,7 +24,7 @@ public class TopicRepository {
     private final LessonMapper lessonMapper;
     private final ModuleTopicRepository moduleTopicRepository;
     private final TopicLessonRepository topicLessonRepository;   // Important for real relationship
-
+    private static final String COLLECTION = "topics";
     private final Firestore firestore;
 
     public CollectionReference getTopicCollection() {
@@ -234,6 +234,79 @@ public class TopicRepository {
             return mappings.size(); // Simple count from mapping (most accurate)
         } catch (Exception e) {
             throw new RuntimeException("Failed to count lessons for topic: " + topicId, e);
+        }
+    }
+    public TopicEntity save(TopicEntity entity) {
+        try {
+            DocumentReference ref = (entity.getId() == null || entity.getId().isBlank())
+                    ? firestore.collection(COLLECTION).document()
+                    : firestore.collection(COLLECTION).document(entity.getId());
+
+            if (entity.getId() == null) entity.setId(ref.getId());
+
+            ref.set(topicMapper.toFirestoreMap(entity)).get();
+            return entity;
+        } catch (Exception e) {
+            throw new RuntimeException("Cannot save topic", e);
+        }
+    }
+
+    public TopicEntity findById(String id) {
+        try {
+            DocumentSnapshot doc = firestore.collection(COLLECTION).document(id).get().get();
+            return topicMapper.fromDocument(doc);
+        } catch (Exception e) {
+            throw new RuntimeException("Cannot find topic", e);
+        }
+    }
+
+
+    public List<TopicEntity> findAllActive(int page, int size, String name) {
+        try {
+            Query query = firestore.collection(COLLECTION)
+                    .whereEqualTo("deleted", false);
+
+            if (StringUtils.hasText(name)) {
+                query = query.whereGreaterThanOrEqualTo("topic_name", name)
+                        .whereLessThanOrEqualTo("topic_name", name + "\uf8ff");
+            }
+
+            query = query.orderBy("create_date", Query.Direction.DESCENDING)
+                    .offset(page * size)
+                    .limit(size + 1);
+
+            List<TopicEntity> list = new ArrayList<>();
+            for (DocumentSnapshot doc : query.get().get().getDocuments()) {
+                list.add(topicMapper.fromDocument(doc));
+            }
+            return list;
+        } catch (Exception e) {
+            throw new RuntimeException("Cannot fetch topics", e);
+        }
+    }
+
+    public long countActive(String name) {
+        try {
+            Query query = firestore.collection(COLLECTION).whereEqualTo("deleted", false);
+            if (StringUtils.hasText(name)) {
+                query = query.whereGreaterThanOrEqualTo("topic_name", name)
+                        .whereLessThanOrEqualTo("topic_name", name + "\uf8ff");
+            }
+            return query.get().get().size();
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    public void softDelete(String id, String deletedBy) {
+        try {
+            firestore.collection(COLLECTION).document(id)
+                    .update("deleted", true,
+                            "update_by", deletedBy,
+                            "update_date", java.time.LocalDateTime.now().toString())
+                    .get();
+        } catch (Exception e) {
+            throw new RuntimeException("Cannot soft delete topic", e);
         }
     }
 }

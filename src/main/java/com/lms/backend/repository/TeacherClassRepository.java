@@ -13,6 +13,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 
@@ -138,7 +139,9 @@ public class TeacherClassRepository {
                 ClassEntity classEntity = classRepository.findById(classId);
                 if (classEntity == null) continue;
 
-                TeacherClassResponse item = TeacherClassResponse.builder().classId(classId).className(classEntity.getClassName()).build();
+                DateTimeFormatter displayFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+                TeacherClassResponse item = TeacherClassResponse.builder().classId(classId).className(classEntity.getClassName()).program(classEntity.getPrograme()).startDate(classEntity.getStartDateClass() != null ? classEntity.getStartDateClass().format(displayFormatter) : "").endDate(classEntity.getEndDateClass() != null ? classEntity.getEndDateClass().format(displayFormatter) : "").status(classEntity.getStatus() != null ? classEntity.getStatus() : "UNKNOWN").build();
 
                 result.add(item);
             }

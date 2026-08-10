@@ -3,18 +3,17 @@ package com.lms.backend.service.impl;
 import com.google.cloud.firestore.DocumentReference;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.SetOptions;
-import com.lms.backend.dto.request.HistoryRequest;
-import com.lms.backend.dto.request.TeacherClassRequest;
-import com.lms.backend.dto.request.TeacherRequest;
-import com.lms.backend.dto.request.AttendanceRequest;
+import com.lms.backend.dto.request.*;
 import com.lms.backend.dto.response.*;
 import com.lms.backend.entity.*;
 import com.lms.backend.exception.BadRequestException;
 import com.lms.backend.exception.ResourceNotFoundException;
+import com.lms.backend.kafka.producer.NotificationKafkaProducer;
 import com.lms.backend.mapper.TeacherClassMapper;
 import com.lms.backend.mapper.TeacherMapper;
 import com.lms.backend.repository.*;
 import com.lms.backend.service.IHistoryService;
+import com.lms.backend.service.IOneSignalService;
 import com.lms.backend.service.ITeacherService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -30,6 +29,7 @@ import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.concurrent.CompletableFuture;
 
 import static com.lms.backend.utils.HistoryChangeUtils.changed;
 
@@ -54,6 +54,10 @@ public class TeacherServiceImpl implements ITeacherService {
 
     private final PasswordEncoder passwordEncoder;
     private final IHistoryService historyService;
+
+    private final NotificationKafkaProducer notificationKafkaProducer;
+
+    private final NotificationRepository notificationRepository;
 
     @Override
     public long countTeachers() throws Exception {
@@ -516,8 +520,16 @@ public class TeacherServiceImpl implements ITeacherService {
 
     @Override
     public String saveSessionAttendance(String classId, String sessionId, List<AttendanceRequest> records) {
+        // 1. Lấy email user từ Thread chính (Vì Thread ngầm sẽ không có SecurityContext)
         String email = getCurrentUserEmail();
+
         return executeWithCatch(() -> {
+            // 2. Lấy dữ liệu cũ để so sánh
+            List<AttendanceEntity> oldAttendanceList = attendanceRepository.findBySession(classId, sessionId);
+            Map<String, String> oldStatusMap = oldAttendanceList.stream()
+                    .collect(Collectors.toMap(AttendanceEntity::getStudentId, AttendanceEntity::getStatus));
+
+            // 3. GHI ĐIỂM DANH VÀO DB NGAY LẬP TỨC (Nhanh, bắt buộc chạy ở luồng chính)
             List<AttendanceEntity> entities = records.stream()
                     .map(r -> AttendanceEntity.builder()
                             .studentId(r.getStudentId())
@@ -525,11 +537,211 @@ public class TeacherServiceImpl implements ITeacherService {
                             .note(r.getNote())
                             .build())
                     .toList();
-
             attendanceRepository.saveAll(classId, sessionId, entities, email);
 
-            return "Lưu điểm danh thành công!";
+            CompletableFuture.runAsync(() -> {
+                try {
+                    // Lấy thông tin buổi học
+                    String sessionTitle;
+                    String sessionDate = "";
+                    List<ClassSessionEntity> sessions = classSessionRepository.findByClassId(classId);
+                    Optional<ClassSessionEntity> currentSession = sessions.stream()
+                            .filter(s -> s.getId().equals(sessionId))
+                            .findFirst();
+                    if (currentSession.isPresent()) {
+                        sessionTitle = currentSession.get().getTitle();
+                        sessionDate = currentSession.get().getSessionDate();
+                    } else {
+                        sessionTitle = "Buổi học";
+                    }
+
+                    // Lấy thông tin Account
+                    List<ClassStudentOptionResponse> allStudentsInClass = buildStudentOptions(classId);
+                    Map<String, String> studentToAccountMap = new HashMap<>();
+                    for (ClassStudentOptionResponse s : allStudentsInClass) {
+                        String accId = resolveAccountIdByStudentId(s.getStudentId());
+                        if (accId != null) studentToAccountMap.put(s.getStudentId(), accId);
+                    }
+
+                    // Nhóm accountId theo trạng thái
+                    String dateDisplay = sessionDate.isBlank() ? "" : " (" + sessionDate + ")";
+                    Map<String, List<String>> statusToAccountsMap = new HashMap<>();
+
+                    for (AttendanceRequest record : records) {
+                        String studentId = record.getStudentId();
+                        String newStatus = record.getStatus();
+                        if (newStatus == null || newStatus.isBlank()) continue;
+
+                        // KIỂM TRA ĐỔI TRẠNG THÁI MỚI GỬI THÔNG BÁO
+                        String oldStatus = oldStatusMap.get(studentId);
+                        if (newStatus.equals(oldStatus)) continue;
+
+                        String accountId = studentToAccountMap.get(studentId);
+                        if (accountId == null) continue;
+
+                        String notifTitle = "Thông báo điểm danh";
+                        String notifBody = String.format("Bạn được đánh dấu '%s' trong %s%s.", newStatus, sessionTitle, dateDisplay);
+
+                        // Lưu quả chuông
+                        String notificationId = notificationRepository.saveNotificationLog(
+                                NotificationEntity.builder()
+                                        .title(notifTitle)
+                                        .body(notifBody)
+                                        .type("ATTENDANCE")
+                                        .targetType("CUSTOM")
+                                        .targetIds(List.of(accountId))
+                                        .senderId(email)
+                                        .build()
+                        );
+                        notificationRepository.pushToUserInbox(accountId, notifTitle, notifBody, null, "ATTENDANCE", classId, sessionId, notificationId);
+
+                        statusToAccountsMap.computeIfAbsent(newStatus, k -> new ArrayList<>()).add(accountId);
+                    }
+
+                    // Gửi OneSignal theo mảng (Batch)
+                    statusToAccountsMap.forEach((status, accountIds) -> {
+                        String notifTitle = "Thông báo điểm danh";
+                        String notifBody = String.format(
+                                "Bạn được đánh dấu '%s' trong %s%s.",
+                                status,
+                                sessionTitle,
+                                dateDisplay
+                        );
+
+                        notificationKafkaProducer.publish(
+                                UUID.randomUUID().toString(),
+                                accountIds,
+                                notifTitle,
+                                notifBody,
+                                Map.of(
+                                        "type", "ATTENDANCE",
+                                        "class_id", classId != null ? classId : "",
+                                        "session_id", sessionId != null ? sessionId : ""
+                                )
+                        );
+                    });
+
+                } catch (Exception e) {
+                    System.err.println("Lỗi luồng ngầm gửi thông báo: " + e.getMessage());
+                }
+            });
+
+            return "Lưu / Cập nhật điểm danh thành công!";
+
         }, "Lỗi hệ thống khi lưu điểm danh");
+    }
+    // Student -> Profile -> accountId
+    private String resolveAccountIdByStudentId(String studentId) {
+        try {
+            StudentEntity student = studentRepository.findById(studentId);
+            if (student == null || Boolean.TRUE.equals(student.getDeleted())) return null;
+
+            ProfileEntity profile = profileRepository.findById(student.getProfileId());
+            if (profile == null) return null;
+
+            return profile.getAccountId();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    @Override
+    public List<ClassStudentOptionResponse> getClassStudents(String classId) {
+        return executeWithCatch(() -> buildStudentOptions(classId), "Lỗi hệ thống khi lấy danh sách học viên của lớp");
+    }
+
+    @Override
+    public String sendClassNotification(String classId, ClassNotificationRequest request) {
+        if (request.getTitle() == null || request.getTitle().isBlank()) {
+            throw new BadRequestException("Tiêu đề thông báo không được để trống.");
+        }
+        if (request.getContent() == null || request.getContent().isBlank()) {
+            throw new BadRequestException("Nội dung thông báo không được để trống.");
+        }
+
+        String email = getCurrentUserEmail();
+
+        return executeWithCatch(() -> {
+            List<ClassStudentOptionResponse> allStudents = buildStudentOptions(classId);
+
+            List<ClassStudentOptionResponse> recipients;
+            if ("CUSTOM".equalsIgnoreCase(request.getTargetType())) {
+                if (request.getStudentIds() == null || request.getStudentIds().isEmpty()) {
+                    throw new BadRequestException("Cần chọn ít nhất 1 học viên.");
+                }
+                recipients = allStudents.stream()
+                        .filter(s -> request.getStudentIds().contains(s.getStudentId()))
+                        .toList();
+            } else {
+                recipients = allStudents; // "ALL"
+            }
+
+            if (recipients.isEmpty()) {
+                throw new BadRequestException("Không tìm thấy học viên phù hợp để gửi.");
+            }
+
+            List<String> accountIds = new ArrayList<>();
+            for (ClassStudentOptionResponse s : recipients) {
+                String accountId = resolveAccountIdByStudentId(s.getStudentId());
+                if (accountId != null) accountIds.add(accountId);
+            }
+
+            String notificationId = notificationRepository.saveNotificationLog(
+                    NotificationEntity.builder()
+                            .title(request.getTitle())
+                            .body(request.getContent())
+                            .note(request.getNote())
+                            .type("CLASS")
+                            .targetType(request.getTargetType())
+                            .targetIds(accountIds)
+                            .senderId(email)
+                            .build()
+            );
+
+            for (String accountId : accountIds) {
+                notificationRepository.pushToUserInbox(accountId, request.getTitle(), request.getContent(), request.getNote(), "CLASS", classId, null, notificationId);
+            }
+
+            notificationKafkaProducer.publish(
+                    notificationId,
+                    accountIds,
+                    request.getTitle(),
+                    request.getContent(),
+                    Map.of(
+                            "type", "CLASS",
+                            "class_id", classId,
+                            "category",
+                            request.getCategory() == null ? "" : request.getCategory()
+                    )
+            );
+
+            return "Đã gửi thông báo tới " + accountIds.size() + " học viên.";
+        }, "Lỗi hệ thống khi gửi thông báo lớp học");
+    }
+
+    // Dùng chung cho cả getClassStudents và sendClassNotification (tránh lặp code)
+    private List<ClassStudentOptionResponse> buildStudentOptions(String classId) throws Exception {
+        List<StudentClassEntity> studentClasses = studentClassRepository.findByClassId(classId);
+        List<ClassStudentOptionResponse> result = new ArrayList<>();
+
+        for (StudentClassEntity sc : studentClasses) {
+            StudentEntity student = studentRepository.findById(sc.getStudentId());
+            if (student == null || Boolean.TRUE.equals(student.getDeleted())) continue;
+
+            ProfileEntity profile = profileRepository.findById(student.getProfileId());
+            if (profile == null) continue;
+
+            AccountEntity account = accountRepository.findEntityById(profile.getAccountId());
+
+            result.add(ClassStudentOptionResponse.builder()
+                    .studentId(sc.getStudentId())
+                    .fullName(profile.getFullName())
+                    .phoneNumber(profile.getPhoneNumber())
+                    .email(account != null ? account.getEmail() : "")
+                    .build());
+        }
+
+        return result;
     }
 
     @Override

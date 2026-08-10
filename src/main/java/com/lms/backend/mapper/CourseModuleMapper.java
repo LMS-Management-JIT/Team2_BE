@@ -21,6 +21,7 @@ public class CourseModuleMapper {
         return CourseModuleEntity.builder()
                 .courseId(request.getCourseId())
                 .moduleId(request.getModuleId())
+                .moduleOrder(request.getModuleOrder())
                 .deleted(request.getDeleted() != null ? request.getDeleted() : false)
                 .build();
     }
@@ -36,6 +37,7 @@ public class CourseModuleMapper {
         if (request == null || existing == null) return;
         existing.setCourseId(request.getCourseId());
         existing.setModuleId(request.getModuleId());
+        if (request.getModuleOrder() != null) existing.setModuleOrder(request.getModuleOrder());
         if (request.getDeleted() != null) existing.setDeleted(request.getDeleted());
     }
 
@@ -49,6 +51,7 @@ public class CourseModuleMapper {
         Map<String, Object> map = new HashMap<>();
         map.put("course_id", entity.getCourseId());
         map.put("module_id", entity.getModuleId());
+        map.put("module_order", entity.getModuleOrder());
         map.put("deleted", entity.getDeleted());
         map.put("created_by", entity.getCreatedBy());
         map.put("updated_by", entity.getUpdatedBy());
@@ -66,6 +69,7 @@ public class CourseModuleMapper {
                 .id(doc.getId())
                 .courseId(doc.getString("course_id"))
                 .moduleId(doc.getString("module_id"))
+                .moduleOrder(doc.getLong("module_order") != null ? doc.getLong("module_order").intValue() : null)
                 .deleted(doc.getBoolean("deleted") != null ? doc.getBoolean("deleted") : false)
                 .createdBy(doc.getString("created_by"))
                 .updatedBy(doc.getString("updated_by"))

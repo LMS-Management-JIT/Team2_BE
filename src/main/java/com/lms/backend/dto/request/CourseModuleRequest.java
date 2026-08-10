@@ -17,6 +17,8 @@ public class CourseModuleRequest {
     @NotBlank(message = "Module ID không được để trống (VD: 03281432-...)")
     private String moduleId;
 
+    private Integer moduleOrder;
+
     private Boolean deleted;
     private String createdBy;
     private String updatedBy;

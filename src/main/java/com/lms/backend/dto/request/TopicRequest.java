@@ -7,5 +7,5 @@ import lombok.Data;
 public class TopicRequest {
     @NotBlank(message = "Tên chủ đề không được để trống")
     private String topicName;
-
+    private String createdBy;
 }

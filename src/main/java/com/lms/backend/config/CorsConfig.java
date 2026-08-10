@@ -22,6 +22,7 @@ public class CorsConfig {
         // MUST be exact origin, NOT "*" when allowCredentials=true
         config.setAllowedOrigins(List.of(
                 "http://localhost:5173",  // Vite dev
+               "http://localhost:5174",  // Vite dev
                 "http://localhost:3000"   // CRA dev (if needed)
         ));
 
