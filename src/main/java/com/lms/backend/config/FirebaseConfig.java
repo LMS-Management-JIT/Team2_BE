@@ -24,8 +24,10 @@ import java.time.LocalDateTime;
 public class FirebaseConfig {
 
 
+/*
     @Value("${firebase.service-account-path}")
-    private String serviceAccountPath;
+*/
+    private String serviceAccountPath=System.getenv("GOOGLE_APPLICATION_CREDENTIALS");;
 
 
     private final ResourceLoader resourceLoader;
