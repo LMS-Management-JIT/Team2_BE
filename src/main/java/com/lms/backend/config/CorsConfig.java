@@ -23,7 +23,8 @@ public class CorsConfig {
         config.setAllowedOrigins(List.of(
                 "http://localhost:5173",  // Vite dev
                "http://localhost:5174",  // Vite dev
-                "http://localhost:3000"   // CRA dev (if needed)
+                "http://localhost:3000",   // CRA dev (if needed)
+                "https://team2-fe-five.vercel.app/"
         ));
 
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
